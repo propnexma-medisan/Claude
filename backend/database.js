@@ -1,0 +1,270 @@
+const Database = require('better-sqlite3');
+const path = require('path');
+
+const db = new Database(path.join(__dirname, 'syndic.db'));
+
+// Enable WAL mode for better performance
+db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
+
+function initializeDatabase() {
+  // Create tables
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS coproprietes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nom TEXT NOT NULL,
+      adresse TEXT NOT NULL,
+      nb_lots INTEGER DEFAULT 0,
+      syndic_nom TEXT,
+      date_creation TEXT NOT NULL,
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS lots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      copropriete_id INTEGER NOT NULL,
+      numero TEXT NOT NULL,
+      type TEXT NOT NULL CHECK(type IN ('Appartement','Commerce','Parking','Cave')),
+      surface REAL,
+      tantiemes INTEGER DEFAULT 0,
+      proprietaire_nom TEXT,
+      proprietaire_email TEXT,
+      proprietaire_tel TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (copropriete_id) REFERENCES coproprietes(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS charges (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      copropriete_id INTEGER NOT NULL,
+      libelle TEXT NOT NULL,
+      montant_total REAL NOT NULL DEFAULT 0,
+      date_echeance TEXT NOT NULL,
+      statut TEXT NOT NULL DEFAULT 'En cours' CHECK(statut IN ('En cours','Soldé','En retard')),
+      budget_annuel REAL DEFAULT 0,
+      exercice INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (copropriete_id) REFERENCES coproprietes(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS charge_repartitions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      charge_id INTEGER NOT NULL,
+      lot_id INTEGER NOT NULL,
+      montant REAL NOT NULL DEFAULT 0,
+      statut_paiement TEXT NOT NULL DEFAULT 'Non payé' CHECK(statut_paiement IN ('Payé','Non payé','Partiel')),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (charge_id) REFERENCES charges(id) ON DELETE CASCADE,
+      FOREIGN KEY (lot_id) REFERENCES lots(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS assemblees (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      copropriete_id INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      heure TEXT NOT NULL,
+      lieu TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'Ordinaire' CHECK(type IN ('Ordinaire','Extraordinaire')),
+      statut TEXT NOT NULL DEFAULT 'Planifiée' CHECK(statut IN ('Planifiée','En cours','Terminée','Annulée')),
+      ordre_du_jour_json TEXT DEFAULT '[]',
+      convocations_envoyees INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (copropriete_id) REFERENCES coproprietes(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS ag_points (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      assemblee_id INTEGER NOT NULL,
+      numero INTEGER NOT NULL,
+      libelle TEXT NOT NULL,
+      description TEXT,
+      type_vote TEXT NOT NULL DEFAULT 'Simple majorité' CHECK(type_vote IN ('Simple majorité','Double majorité','Unanimité')),
+      resultat TEXT CHECK(resultat IN ('Approuvé','Refusé','Ajourné') OR resultat IS NULL),
+      votes_pour INTEGER DEFAULT 0,
+      votes_contre INTEGER DEFAULT 0,
+      votes_abstention INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (assemblee_id) REFERENCES assemblees(id) ON DELETE CASCADE
+    );
+  `);
+
+  // Seed data if tables are empty
+  const count = db.prepare('SELECT COUNT(*) as c FROM coproprietes').get();
+  if (count.c === 0) {
+    seedData();
+  }
+}
+
+function seedData() {
+  const insertCopro = db.prepare(`
+    INSERT INTO coproprietes (nom, adresse, nb_lots, syndic_nom, date_creation, notes)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+
+  const insertLot = db.prepare(`
+    INSERT INTO lots (copropriete_id, numero, type, surface, tantiemes, proprietaire_nom, proprietaire_email, proprietaire_tel)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const insertCharge = db.prepare(`
+    INSERT INTO charges (copropriete_id, libelle, montant_total, date_echeance, statut, budget_annuel, exercice)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const insertRepartition = db.prepare(`
+    INSERT INTO charge_repartitions (charge_id, lot_id, montant, statut_paiement)
+    VALUES (?, ?, ?, ?)
+  `);
+
+  const insertAssemblee = db.prepare(`
+    INSERT INTO assemblees (copropriete_id, date, heure, lieu, type, statut, convocations_envoyees)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const insertPoint = db.prepare(`
+    INSERT INTO ag_points (assemblee_id, numero, libelle, description, type_vote, resultat, votes_pour, votes_contre, votes_abstention)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  // Copropriété 1
+  const cp1 = insertCopro.run(
+    'Résidence Les Oliviers',
+    '12 Avenue des Fleurs, 06000 Nice',
+    8,
+    'Cabinet Riviera Syndic',
+    '2010-03-15',
+    'Résidence de standing avec piscine et gardien.'
+  );
+
+  // Lots de la copropriété 1
+  const lot1 = insertLot.run(cp1.lastInsertRowid, 'A101', 'Appartement', 65.5, 850, 'Marie Dupont', 'marie.dupont@email.fr', '06 12 34 56 78');
+  const lot2 = insertLot.run(cp1.lastInsertRowid, 'A102', 'Appartement', 48.0, 620, 'Jean Martin', 'jean.martin@email.fr', '06 23 45 67 89');
+  const lot3 = insertLot.run(cp1.lastInsertRowid, 'A201', 'Appartement', 85.0, 1100, 'Pierre Blanc', 'p.blanc@email.fr', '06 34 56 78 90');
+  const lot4 = insertLot.run(cp1.lastInsertRowid, 'C001', 'Commerce', 120.0, 1560, 'SAS Le Bon Goût', 'contact@lebongout.fr', '04 93 12 34 56');
+  const lot5 = insertLot.run(cp1.lastInsertRowid, 'P001', 'Parking', 12.5, 125, 'Marie Dupont', 'marie.dupont@email.fr', '06 12 34 56 78');
+  const lot6 = insertLot.run(cp1.lastInsertRowid, 'P002', 'Parking', 12.5, 125, 'Jean Martin', 'jean.martin@email.fr', '06 23 45 67 89');
+
+  // Copropriété 2
+  const cp2 = insertCopro.run(
+    'Immeuble Le Beaumont',
+    '5 Rue de la République, 69001 Lyon',
+    5,
+    'Cabinet Rhône Gestion',
+    '2005-09-01',
+    'Immeuble haussmannien rénové en 2018.'
+  );
+
+  // Lots de la copropriété 2
+  const lot7 = insertLot.run(cp2.lastInsertRowid, '1er Gauche', 'Appartement', 95.0, 2400, 'Sophie Leroy', 's.leroy@email.fr', '06 45 67 89 01');
+  const lot8 = insertLot.run(cp2.lastInsertRowid, '1er Droite', 'Appartement', 72.0, 1820, 'Thomas Bernard', 'thomas.b@email.fr', '06 56 78 90 12');
+  const lot9 = insertLot.run(cp2.lastInsertRowid, '2ème', 'Appartement', 110.0, 2780, 'Isabelle Moreau', 'i.moreau@email.fr', '06 67 89 01 23');
+  const lot10 = insertLot.run(cp2.lastInsertRowid, 'Cave 1', 'Cave', 8.0, 80, 'Sophie Leroy', 's.leroy@email.fr', '06 45 67 89 01');
+  const lot11 = insertLot.run(cp2.lastInsertRowid, 'Cave 2', 'Cave', 6.5, 65, 'Thomas Bernard', 'thomas.b@email.fr', '06 56 78 90 12');
+
+  // Copropriété 3
+  const cp3 = insertCopro.run(
+    'Villa Méditerranée',
+    '28 Boulevard de la Mer, 13008 Marseille',
+    4,
+    'Cabinet Marseille Syndic',
+    '2015-06-20',
+    'Petite copropriété vue mer, accès direct à la plage.'
+  );
+
+  const lot12 = insertLot.run(cp3.lastInsertRowid, 'Villa A', 'Appartement', 130.0, 3000, 'François Petit', 'f.petit@email.fr', '06 78 90 12 34');
+  const lot13 = insertLot.run(cp3.lastInsertRowid, 'Villa B', 'Appartement', 115.0, 2650, 'Nathalie Simon', 'n.simon@email.fr', '06 89 01 23 45');
+  const lot14 = insertLot.run(cp3.lastInsertRowid, 'Garage A', 'Parking', 20.0, 175, 'François Petit', 'f.petit@email.fr', '06 78 90 12 34');
+  const lot15 = insertLot.run(cp3.lastInsertRowid, 'Garage B', 'Parking', 20.0, 175, 'Nathalie Simon', 'n.simon@email.fr', '06 89 01 23 45');
+
+  // Update nb_lots
+  db.prepare('UPDATE coproprietes SET nb_lots = (SELECT COUNT(*) FROM lots WHERE copropriete_id = ?) WHERE id = ?').run(cp1.lastInsertRowid, cp1.lastInsertRowid);
+  db.prepare('UPDATE coproprietes SET nb_lots = (SELECT COUNT(*) FROM lots WHERE copropriete_id = ?) WHERE id = ?').run(cp2.lastInsertRowid, cp2.lastInsertRowid);
+  db.prepare('UPDATE coproprietes SET nb_lots = (SELECT COUNT(*) FROM lots WHERE copropriete_id = ?) WHERE id = ?').run(cp3.lastInsertRowid, cp3.lastInsertRowid);
+
+  // Charges
+  const charge1 = insertCharge.run(
+    cp1.lastInsertRowid,
+    'Charges courantes - T1 2026',
+    4800.00,
+    '2026-03-31',
+    'En cours',
+    19200.00,
+    2026
+  );
+  insertRepartition.run(charge1.lastInsertRowid, lot1.lastInsertRowid, 816.00, 'Payé');
+  insertRepartition.run(charge1.lastInsertRowid, lot2.lastInsertRowid, 595.20, 'Non payé');
+  insertRepartition.run(charge1.lastInsertRowid, lot3.lastInsertRowid, 1056.00, 'Payé');
+  insertRepartition.run(charge1.lastInsertRowid, lot4.lastInsertRowid, 1497.60, 'Non payé');
+
+  const charge2 = insertCharge.run(
+    cp2.lastInsertRowid,
+    'Ravalement de façade 2025',
+    28500.00,
+    '2025-12-31',
+    'En retard',
+    28500.00,
+    2025
+  );
+  insertRepartition.run(charge2.lastInsertRowid, lot7.lastInsertRowid, 9576.00, 'Partiel');
+  insertRepartition.run(charge2.lastInsertRowid, lot8.lastInsertRowid, 7260.90, 'Non payé');
+  insertRepartition.run(charge2.lastInsertRowid, lot9.lastInsertRowid, 11088.90, 'Non payé');
+
+  const charge3 = insertCharge.run(
+    cp1.lastInsertRowid,
+    'Contrat ascenseur annuel',
+    2400.00,
+    '2025-12-31',
+    'Soldé',
+    2400.00,
+    2025
+  );
+  insertRepartition.run(charge3.lastInsertRowid, lot1.lastInsertRowid, 408.00, 'Payé');
+  insertRepartition.run(charge3.lastInsertRowid, lot2.lastInsertRowid, 297.60, 'Payé');
+  insertRepartition.run(charge3.lastInsertRowid, lot3.lastInsertRowid, 528.00, 'Payé');
+
+  const charge4 = insertCharge.run(
+    cp3.lastInsertRowid,
+    'Entretien espaces verts - Annuel',
+    3600.00,
+    '2026-06-30',
+    'En cours',
+    3600.00,
+    2026
+  );
+  insertRepartition.run(charge4.lastInsertRowid, lot12.lastInsertRowid, 1800.00, 'Non payé');
+  insertRepartition.run(charge4.lastInsertRowid, lot13.lastInsertRowid, 1800.00, 'Non payé');
+
+  // Assemblées Générales
+  const ag1 = insertAssemblee.run(
+    cp1.lastInsertRowid,
+    '2026-06-15',
+    '18:00',
+    'Salle polyvalente - 12 Avenue des Fleurs, Nice',
+    'Ordinaire',
+    'Planifiée',
+    1
+  );
+  insertPoint.run(ag1.lastInsertRowid, 1, 'Approbation des comptes 2025', 'Présentation et vote des comptes de l\'exercice 2025 par le syndic.', 'Simple majorité', null, 0, 0, 0);
+  insertPoint.run(ag1.lastInsertRowid, 2, 'Budget prévisionnel 2026', 'Vote du budget prévisionnel pour l\'exercice 2026 incluant les charges courantes.', 'Simple majorité', null, 0, 0, 0);
+  insertPoint.run(ag1.lastInsertRowid, 3, 'Remplacement de la chaudière', 'Devis pour le remplacement de la chaudière collective - montant estimé 15 000 €.', 'Double majorité', null, 0, 0, 0);
+
+  const ag2 = insertAssemblee.run(
+    cp2.lastInsertRowid,
+    '2025-11-20',
+    '19:00',
+    'Cabinet Rhône Gestion - 10 Rue de la Paix, Lyon',
+    'Extraordinaire',
+    'Terminée',
+    1
+  );
+  insertPoint.run(ag2.lastInsertRowid, 1, 'Validation devis ravalement de façade', 'Vote pour l\'approbation du devis de ravalement sélectionné - Entreprise Rénov\'Art.', 'Double majorité', 'Approuvé', 8, 1, 1);
+  insertPoint.run(ag2.lastInsertRowid, 2, 'Appel de fonds travaux', 'Modalités de l\'appel de fonds spécial pour financer le ravalement.', 'Simple majorité', 'Approuvé', 9, 0, 1);
+  insertPoint.run(ag2.lastInsertRowid, 3, 'Questions diverses', 'Divers sujets abordés par les copropriétaires.', 'Simple majorité', 'Ajourné', 3, 3, 4);
+
+  console.log('Base de données initialisée avec les données de démonstration.');
+}
+
+initializeDatabase();
+
+module.exports = db;
