@@ -1,5 +1,6 @@
 const Database = require('better-sqlite3');
 const path = require('path');
+const bcrypt = require('bcrypt');
 
 const db = new Database(path.join(__dirname, 'syndic.db'));
 
@@ -86,6 +87,51 @@ function initializeDatabase() {
       votes_abstention INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (assemblee_id) REFERENCES assemblees(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nom TEXT NOT NULL,
+      prenom TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      role TEXT NOT NULL CHECK(role IN ('admin','gestionnaire','copropietaire')),
+      copropriete_id INTEGER REFERENCES coproprietes(id) ON DELETE SET NULL,
+      lot_id INTEGER REFERENCES lots(id) ON DELETE SET NULL,
+      telephone TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      is_active INTEGER DEFAULT 1
+    );
+
+    CREATE TABLE IF NOT EXISTS tickets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      copropriete_id INTEGER NOT NULL REFERENCES coproprietes(id),
+      lot_id INTEGER REFERENCES lots(id),
+      createur_id INTEGER NOT NULL REFERENCES users(id),
+      titre TEXT NOT NULL,
+      description TEXT NOT NULL,
+      categorie TEXT DEFAULT 'Général',
+      statut TEXT DEFAULT 'Ouvert' CHECK(statut IN ('Ouvert','En cours','Résolu','Fermé')),
+      priorite TEXT DEFAULT 'Normale' CHECK(priorite IN ('Basse','Normale','Haute','Urgente')),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS ticket_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ticket_id INTEGER NOT NULL REFERENCES tickets(id),
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      message TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS messages_diffusion (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      copropriete_id INTEGER NOT NULL REFERENCES coproprietes(id),
+      gestionnaire_id INTEGER NOT NULL REFERENCES users(id),
+      titre TEXT NOT NULL,
+      contenu TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
 
@@ -261,6 +307,20 @@ function seedData() {
   insertPoint.run(ag2.lastInsertRowid, 1, 'Validation devis ravalement de façade', 'Vote pour l\'approbation du devis de ravalement sélectionné - Entreprise Rénov\'Art.', 'Double majorité', 'Approuvé', 8, 1, 1);
   insertPoint.run(ag2.lastInsertRowid, 2, 'Appel de fonds travaux', 'Modalités de l\'appel de fonds spécial pour financer le ravalement.', 'Simple majorité', 'Approuvé', 9, 0, 1);
   insertPoint.run(ag2.lastInsertRowid, 3, 'Questions diverses', 'Divers sujets abordés par les copropriétaires.', 'Simple majorité', 'Ajourné', 3, 3, 4);
+
+  // Seed users
+  const adminHash = bcrypt.hashSync('Admin2024!', 10);
+  const gestHash = bcrypt.hashSync('Gest2024!', 10);
+  const coproHash = bcrypt.hashSync('Copro2024!', 10);
+
+  const insertUser = db.prepare(`
+    INSERT INTO users (nom, prenom, email, password_hash, role, copropriete_id, lot_id, telephone)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  insertUser.run('Admin', 'Système', 'admin@syndic.ma', adminHash, 'admin', null, null, null);
+  insertUser.run('Gestionnaire', 'Principal', 'gestionnaire@syndic.ma', gestHash, 'gestionnaire', cp1.lastInsertRowid, null, '06 00 00 00 01');
+  insertUser.run('Copropriétaire', 'Demo', 'copro@syndic.ma', coproHash, 'copropietaire', cp1.lastInsertRowid, lot1.lastInsertRowid, '06 00 00 00 02');
 
   console.log('Base de données initialisée avec les données de démonstration.');
 }
