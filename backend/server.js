@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const db = require('./database');
+const { authenticate, requireRole } = require('./middleware/auth');
 
 const app = express();
 const PORT = 3001;
@@ -9,21 +10,38 @@ const PORT = 3001;
 app.use(cors());
 app.use(express.json());
 
-// Routes
+// Public route — login
+const authRouter = require('./routes/auth');
+app.use('/api/auth', authRouter);
+
+// Health check (public)
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// All routes below require authentication
 const copropietesRouter = require('./routes/coproprietes');
 const lotsRouter = require('./routes/lots');
 const chargesRouter = require('./routes/charges');
 const assembleesRouter = require('./routes/assemblees');
 const agPointsRouter = require('./routes/agpoints');
+const usersRouter = require('./routes/users');
+const ticketsRouter = require('./routes/tickets');
+const messagesRouter = require('./routes/messages');
+const financesRouter = require('./routes/finances');
 
-app.use('/api/coproprietes', copropietesRouter);
-app.use('/api/lots', lotsRouter);
-app.use('/api/charges', chargesRouter);
-app.use('/api/assemblees', assembleesRouter);
-app.use('/api/ag-points', agPointsRouter);
+app.use('/api/coproprietes', authenticate, copropietesRouter);
+app.use('/api/lots', authenticate, lotsRouter);
+app.use('/api/charges', authenticate, chargesRouter);
+app.use('/api/assemblees', authenticate, assembleesRouter);
+app.use('/api/ag-points', authenticate, agPointsRouter);
+app.use('/api/users', usersRouter);
+app.use('/api/tickets', ticketsRouter);
+app.use('/api/messages', messagesRouter);
+app.use('/api/finances', financesRouter);
 
-// Dashboard stats
-app.get('/api/dashboard/stats', (req, res) => {
+// Dashboard stats (admin/gestionnaire)
+app.get('/api/dashboard/stats', authenticate, (req, res) => {
   try {
     const nbCoproprietes = db.prepare('SELECT COUNT(*) as count FROM coproprietes').get().count;
     const nbLots = db.prepare('SELECT COUNT(*) as count FROM lots').get().count;
@@ -73,6 +91,15 @@ app.get('/api/dashboard/stats', (req, res) => {
       LIMIT 3
     `).all();
 
+    const nbGestionnaires = db.prepare('SELECT COUNT(*) as count FROM users WHERE role = ?').get('gestionnaire').count;
+    const nbCopropietaires = db.prepare('SELECT COUNT(*) as count FROM users WHERE role = ?').get('copropietaire').count;
+
+    const totalImpaye = db.prepare(`
+      SELECT COALESCE(SUM(cr.montant), 0) as total
+      FROM charge_repartitions cr
+      WHERE cr.statut_paiement = 'Non payé'
+    `).get().total;
+
     res.json({
       nbCoproprietes,
       nbLots,
@@ -82,15 +109,13 @@ app.get('/api/dashboard/stats', (req, res) => {
       prochaineAG,
       recentCharges,
       recentAGs,
+      nbGestionnaires,
+      nbCopropietaires,
+      totalImpaye,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-});
-
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // 404 handler

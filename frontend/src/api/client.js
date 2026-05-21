@@ -2,11 +2,18 @@
 // En développement local, on passe par localhost:3001.
 const BASE_URL = import.meta.env.PROD ? '/api' : 'http://localhost:3001/api';
 
+function getToken() {
+  return localStorage.getItem('syndic_token');
+}
+
 async function request(path, options = {}) {
   const url = `${BASE_URL}${path}`;
+  const token = getToken();
+
   const config = {
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
     ...options,
@@ -88,4 +95,42 @@ export const agPoints = {
 // Dashboard
 export const dashboard = {
   getStats: () => api.get('/dashboard/stats'),
+};
+
+// Users
+export const users = {
+  getAll: () => api.get('/users'),
+  create: (data) => api.post('/users', data),
+  update: (id, data) => api.put(`/users/${id}`, data),
+  delete: (id) => api.delete(`/users/${id}`),
+  byResidence: (coproprieteId) => api.get(`/users/by-residence/${coproprieteId}`),
+};
+
+// Tickets
+export const tickets = {
+  getAll: () => api.get('/tickets'),
+  create: (data) => api.post('/tickets', data),
+  update: (id, data) => api.put(`/tickets/${id}`, data),
+  getMessages: (id) => api.get(`/tickets/${id}/messages`),
+  addMessage: (id, data) => api.post(`/tickets/${id}/messages`, data),
+};
+
+// Messages de diffusion
+export const messages = {
+  getAll: () => api.get('/messages'),
+  create: (data) => api.post('/messages', data),
+  delete: (id) => api.delete(`/messages/${id}`),
+};
+
+// Finances
+export const finances = {
+  getByResidence: (id) => api.get(`/finances/${id}`),
+  getGlobal: () => api.get('/finances/global'),
+};
+
+// Auth
+export const auth = {
+  login: (email, password) => api.post('/auth/login', { email, password }),
+  me: () => api.get('/auth/me'),
+  logout: () => api.post('/auth/logout', {}),
 };
