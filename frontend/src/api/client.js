@@ -134,3 +134,29 @@ export const auth = {
   me: () => api.get('/auth/me'),
   logout: () => api.post('/auth/logout', {}),
 };
+
+// Budgets
+export const budgets = {
+  getAll: (coproprieteId) => api.get(`/budgets?copropriete_id=${coproprieteId}`),
+  create: (data) => api.post('/budgets', data),
+  getById: (id) => api.get(`/budgets/${id}`),
+  update: (id, data) => api.put(`/budgets/${id}`, data),
+  delete: (id) => api.delete(`/budgets/${id}`),
+  getLignes: (id) => api.get(`/budgets/${id}/lignes`),
+  updateLigne: (budgetId, ligneId, data) => api.put(`/budgets/${budgetId}/lignes/${ligneId}`, data),
+  getSynthese: (id) => api.get(`/budgets/${id}/synthese`),
+};
+
+export const depenses = {
+  getAll: (params) => api.get(`/depenses?${new URLSearchParams(params)}`),
+  create: (data) => api.post('/depenses', data),
+  update: (id, data) => api.put(`/depenses/${id}`, data),
+  delete: (id) => api.delete(`/depenses/${id}`),
+};
+
+export const appelsFonds = {
+  getAll: (coproprieteId) => api.get(`/appels-fonds?copropriete_id=${coproprieteId}`),
+  create: (data) => api.post('/appels-fonds', data),
+  update: (id, data) => api.put(`/appels-fonds/${id}`, data),
+  delete: (id) => api.delete(`/appels-fonds/${id}`),
+};

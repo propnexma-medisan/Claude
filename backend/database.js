@@ -133,6 +133,59 @@ function initializeDatabase() {
       contenu TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS budgets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      copropriete_id INTEGER NOT NULL REFERENCES coproprietes(id) ON DELETE CASCADE,
+      annee INTEGER NOT NULL,
+      statut TEXT DEFAULT 'Brouillon' CHECK(statut IN ('Brouillon','Soumis','Approuvé','Clôturé')),
+      notes TEXT,
+      created_by INTEGER REFERENCES users(id),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(copropriete_id, annee)
+    );
+
+    CREATE TABLE IF NOT EXISTS budget_lignes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      budget_id INTEGER NOT NULL REFERENCES budgets(id) ON DELETE CASCADE,
+      categorie TEXT NOT NULL,
+      montant_annuel REAL DEFAULT 0,
+      jan REAL DEFAULT 0, fev REAL DEFAULT 0, mar REAL DEFAULT 0,
+      avr REAL DEFAULT 0, mai REAL DEFAULT 0, jun REAL DEFAULT 0,
+      jul REAL DEFAULT 0, aou REAL DEFAULT 0, sep REAL DEFAULT 0,
+      oct REAL DEFAULT 0, nov REAL DEFAULT 0, dec REAL DEFAULT 0,
+      notes TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS depenses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      copropriete_id INTEGER NOT NULL REFERENCES coproprietes(id) ON DELETE CASCADE,
+      budget_id INTEGER REFERENCES budgets(id) ON DELETE SET NULL,
+      categorie TEXT NOT NULL,
+      libelle TEXT NOT NULL,
+      montant REAL NOT NULL,
+      date_depense DATE NOT NULL,
+      fournisseur TEXT,
+      numero_facture TEXT,
+      notes TEXT,
+      created_by INTEGER REFERENCES users(id),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS appels_fonds (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      copropriete_id INTEGER NOT NULL REFERENCES coproprietes(id) ON DELETE CASCADE,
+      budget_id INTEGER REFERENCES budgets(id),
+      libelle TEXT NOT NULL,
+      motif TEXT,
+      montant_total REAL NOT NULL,
+      date_appel DATE NOT NULL,
+      date_echeance DATE NOT NULL,
+      statut TEXT DEFAULT 'En cours' CHECK(statut IN ('En cours','Soldé','Annulé')),
+      created_by INTEGER REFERENCES users(id),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   // Seed data if tables are empty
