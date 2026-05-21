@@ -3,6 +3,8 @@ backend/node_modules/
 frontend/node_modules/
 backend/syndic.db
 *.db
+*.db-shm
+*.db-wal
 .env
 .env.local
 dist/

@@ -7,7 +7,6 @@ const statusColors = {
   'Soldé': 'bg-green-100 text-green-700',
   'En retard': 'bg-red-100 text-red-700',
   'Planifiée': 'bg-indigo-100 text-indigo-700',
-  'En cours': 'bg-yellow-100 text-yellow-700',
   'Terminée': 'bg-gray-100 text-gray-600',
   'Annulée': 'bg-red-100 text-red-600',
 };
