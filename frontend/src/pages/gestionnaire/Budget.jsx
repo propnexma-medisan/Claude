@@ -206,7 +206,7 @@ function TabBudgets({ coproprieteId }) {
   return (
     <div>
       {/* Toolbar */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex flex-wrap items-center gap-3 mb-6">
         <select
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
           value={selectedYear}
@@ -226,9 +226,9 @@ function TabBudgets({ coproprieteId }) {
         </button>
       </div>
 
-      <div className="flex gap-6">
+      <div className="flex flex-col lg:flex-row gap-6">
         {/* List */}
-        <div className="w-72 flex-shrink-0">
+        <div className="w-full lg:w-72 lg:flex-shrink-0">
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Budgets</h3>
           {budgetsList.length === 0 ? (
             <div className="text-center py-8 text-gray-400 text-sm bg-white rounded-lg border border-gray-200">
@@ -500,7 +500,7 @@ function TabDepenses({ coproprieteId }) {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <p className="text-xs text-gray-500 mb-1">Total dépensé</p>
           <p className="text-2xl font-bold text-gray-800">{fmt(totalDepense)} €</p>
@@ -519,8 +519,8 @@ function TabDepenses({ coproprieteId }) {
       {loading ? (
         <div className="flex justify-center py-10"><div className="animate-spin w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full" /></div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
+          <table className="w-full text-sm min-w-[700px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Date</th>
@@ -746,7 +746,7 @@ function TabSynthese({ coproprieteId }) {
       ) : synthese ? (
         <>
           {/* Global summary cards */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div className="bg-white rounded-lg border border-gray-200 p-4">
               <p className="text-xs text-gray-500 mb-1">Budget total</p>
               <p className="text-xl font-bold text-gray-800">{fmt(totBudget)} €</p>
@@ -766,8 +766,8 @@ function TabSynthese({ coproprieteId }) {
           </div>
 
           {/* Per-category table with progress bars */}
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
+            <table className="w-full text-sm min-w-[600px]">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Catégorie</th>
@@ -939,8 +939,8 @@ function TabAppelsFonds({ coproprieteId }) {
       {loading ? (
         <div className="flex justify-center py-10"><div className="animate-spin w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full" /></div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
+          <table className="w-full text-sm min-w-[650px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Libellé</th>
@@ -1126,7 +1126,7 @@ export default function Budget() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-200 mb-6 gap-1">
+      <div className="flex flex-wrap border-b border-gray-200 mb-6 gap-1">
         {TABS.map(tab => (
           <button
             key={tab.id}

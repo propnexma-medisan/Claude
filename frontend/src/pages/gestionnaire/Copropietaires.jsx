@@ -91,7 +91,7 @@ function Copropietaires() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Copropriétaires</h1>
           <p className="text-sm text-gray-500 mt-1">{list.length} copropriétaire{list.length > 1 ? 's' : ''}</p>
@@ -105,8 +105,8 @@ function Copropietaires() {
       {loading ? (
         <div className="flex justify-center py-12"><div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" /></div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-          <table className="w-full text-sm">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
+          <table className="w-full text-sm min-w-[600px]">
             <thead className="bg-gray-50">
               <tr>
                 {['Copropriétaire', 'Email', 'Téléphone', 'Lot', 'Statut', ''].map((h) => (

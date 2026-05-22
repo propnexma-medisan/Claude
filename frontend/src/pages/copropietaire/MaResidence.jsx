@@ -43,7 +43,7 @@ function MaResidence() {
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-2xl w-full space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-800">Ma résidence</h1>
         <p className="text-sm text-gray-500 mt-1">Informations sur votre résidence</p>
@@ -60,7 +60,7 @@ function MaResidence() {
             </div>
             <h2 className="font-semibold text-gray-800">Résidence</h2>
           </div>
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
             <div>
               <p className="text-gray-500">Nom</p>
               <p className="font-medium text-gray-800 mt-0.5">{copropriete.nom}</p>
@@ -104,7 +104,7 @@ function MaResidence() {
             </div>
             <h2 className="font-semibold text-gray-800">Mon lot</h2>
           </div>
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
             <div>
               <p className="text-gray-500">Numéro</p>
               <p className="font-medium text-gray-800 mt-0.5">{lot.numero}</p>

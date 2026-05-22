@@ -182,7 +182,7 @@ function CotisationCard({ c, isActive, expanded, onToggle }) {
             ))}
           </div>
           {/* Summary */}
-          <div className="grid grid-cols-3 gap-3 mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
             <div className="bg-green-50 rounded-xl p-3 text-center">
               <p className="text-xs text-gray-500 mb-1">Total payé</p>
               <p className="font-bold text-green-600">{fmt(totalPaye)}</p>
@@ -294,7 +294,7 @@ function MesCotisations() {
   const newRelancesCount = mesRelances.filter((r) => r.statut === 'Envoyée').length;
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="max-w-3xl w-full space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-800">Mes cotisations</h1>
         <p className="text-sm text-gray-500 mt-1">{user.copropriete_nom || ''}</p>

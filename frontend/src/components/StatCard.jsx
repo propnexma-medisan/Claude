@@ -12,9 +12,9 @@ function StatCard({ label, value, icon, color = 'blue', sub }) {
   return (
     <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
       <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm font-medium text-gray-500">{label}</p>
-          <p className="mt-1 text-2xl font-bold text-gray-800">{value}</p>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-gray-500 truncate">{label}</p>
+          <p className="mt-1 text-xl sm:text-2xl font-bold text-gray-800 truncate">{value}</p>
           {sub && <p className="mt-1 text-xs text-gray-400">{sub}</p>}
         </div>
         {icon && (

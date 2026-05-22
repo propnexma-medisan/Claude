@@ -31,6 +31,7 @@ function MesTickets() {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
+  const [showDetail, setShowDetail] = useState(false);
   const [messages, setMessages] = useState([]);
   const [msgLoading, setMsgLoading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
@@ -48,6 +49,7 @@ function MesTickets() {
   const openTicket = (t) => {
     setSelected(t);
     setShowCreate(false);
+    setShowDetail(true);
     setMsgLoading(true);
     ticketsApi.getMessages(t.id).then(setMessages).catch(() => setMessages([])).finally(() => setMsgLoading(false));
   };
@@ -91,13 +93,13 @@ function MesTickets() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Mes tickets</h1>
           <p className="text-sm text-gray-500 mt-1">Vos demandes et réclamations</p>
         </div>
         <button
-          onClick={() => { setShowCreate(true); setSelected(null); setFormError(null); }}
+          onClick={() => { setShowCreate(true); setSelected(null); setShowDetail(true); setFormError(null); }}
           className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
@@ -105,9 +107,9 @@ function MesTickets() {
         </button>
       </div>
 
-      <div className="flex gap-6">
+      <div className="flex flex-col lg:flex-row gap-6">
         {/* Ticket list */}
-        <div className="w-72 flex-shrink-0 space-y-3">
+        <div className={`w-full lg:w-72 lg:flex-shrink-0 space-y-3 ${showDetail ? 'hidden lg:block' : 'block'}`}>
           {loading && <div className="flex justify-center py-8"><div className="animate-spin w-6 h-6 border-4 border-green-500 border-t-transparent rounded-full" /></div>}
           {!loading && list.length === 0 && (
             <div className="bg-white rounded-xl p-6 text-center text-gray-400 text-sm border border-dashed border-gray-200">
@@ -128,7 +130,19 @@ function MesTickets() {
         </div>
 
         {/* Main panel */}
-        <div className="flex-1">
+        <div className={`flex-1 ${!showDetail ? 'hidden lg:block' : 'block'}`}>
+          {/* Back button on mobile */}
+          {showDetail && (
+            <button
+              onClick={() => setShowDetail(false)}
+              className="lg:hidden flex items-center gap-2 mb-4 text-sm text-green-600 font-medium"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Retour
+            </button>
+          )}
           {showCreate ? (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
               <h2 className="font-semibold text-gray-800 mb-4">Nouveau ticket</h2>

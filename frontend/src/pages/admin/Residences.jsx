@@ -116,7 +116,7 @@ function Residences() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Résidences</h1>
           <p className="text-sm text-gray-500 mt-1">{list.length} résidence{list.length > 1 ? 's' : ''} enregistrée{list.length > 1 ? 's' : ''}</p>
@@ -127,8 +127,8 @@ function Residences() {
         </button>
       </div>
 
-      <div className="flex gap-6">
-        <div className="w-80 flex-shrink-0 space-y-3">
+      <div className="flex flex-col lg:flex-row gap-6">
+        <div className="w-full lg:w-80 lg:flex-shrink-0 space-y-3">
           {loading && <div className="flex justify-center py-8"><div className="animate-spin w-6 h-6 border-4 border-purple-500 border-t-transparent rounded-full" /></div>}
           {!loading && list.length === 0 && <div className="bg-white rounded-xl p-6 text-center text-gray-400 text-sm border border-dashed border-gray-200">Aucune résidence</div>}
           {list.map((c) => (
@@ -155,14 +155,14 @@ function Residences() {
           ) : (
             <div className="space-y-4">
               <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between flex-wrap gap-3">
                   <div>
                     <h2 className="text-xl font-bold text-gray-800">{selected.nom}</h2>
                     <p className="text-sm text-gray-500 mt-1">{selected.adresse}</p>
                     {selected.syndic_nom && <p className="text-sm text-purple-600 mt-1">Syndic : {selected.syndic_nom}</p>}
                     {selected.notes && <p className="text-sm text-gray-400 mt-2 italic">{selected.notes}</p>}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-shrink-0">
                     <button onClick={() => openEdit(selected)} className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors">Modifier</button>
                     <button onClick={() => del(selected.id)} className="px-3 py-1.5 text-sm border border-red-200 rounded-lg hover:bg-red-50 text-red-600 transition-colors">Supprimer</button>
                   </div>
@@ -180,7 +180,8 @@ function Residences() {
                 {lotsLoading ? (
                   <div className="flex justify-center py-6"><div className="animate-spin w-5 h-5 border-4 border-purple-500 border-t-transparent rounded-full" /></div>
                 ) : (
-                  <table className="w-full text-sm">
+                  <div className="overflow-x-auto">
+                  <table className="w-full text-sm min-w-[500px]">
                     <thead className="bg-gray-50">
                       <tr>
                         {['N°', 'Type', 'Surface', 'Tantièmes', 'Propriétaire', ''].map((h) => (
@@ -216,6 +217,7 @@ function Residences() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 )}
               </div>
             </div>

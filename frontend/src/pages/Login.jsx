@@ -27,7 +27,7 @@ function Login() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 sm:mx-auto p-6 sm:p-8">
         {/* Logo */}
         <div className="flex items-center justify-center gap-3 mb-8">
           <div className="w-10 h-10 bg-[#1e3a5f] rounded-xl flex items-center justify-center">

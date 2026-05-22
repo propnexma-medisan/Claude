@@ -26,6 +26,7 @@ function Tickets() {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
+  const [showDetail, setShowDetail] = useState(false);
   const [messages, setMessages] = useState([]);
   const [msgLoading, setMsgLoading] = useState(false);
   const [newMsg, setNewMsg] = useState('');
@@ -40,6 +41,7 @@ function Tickets() {
 
   const openTicket = (t) => {
     setSelected(t);
+    setShowDetail(true);
     setMsgLoading(true);
     ticketsApi.getMessages(t.id).then(setMessages).catch(() => setMessages([])).finally(() => setMsgLoading(false));
   };
@@ -86,11 +88,11 @@ function Tickets() {
         <p className="text-sm text-gray-500 mt-1">Support et demandes des copropriétaires</p>
       </div>
 
-      <div className="flex gap-6">
+      <div className="flex flex-col lg:flex-row gap-6">
         {/* Ticket list */}
-        <div className="w-96 flex-shrink-0 space-y-3">
+        <div className={`w-full lg:w-96 lg:flex-shrink-0 space-y-3 ${showDetail ? 'hidden lg:block' : 'block'}`}>
           {/* Filters */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <select value={filterStatut} onChange={(e) => setFilterStatut(e.target.value)} className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="">Tous les statuts</option>
               <option>Ouvert</option>
@@ -128,7 +130,19 @@ function Tickets() {
         </div>
 
         {/* Ticket detail */}
-        <div className="flex-1">
+        <div className={`flex-1 ${!showDetail ? 'hidden lg:block' : 'block'}`}>
+          {/* Back button on mobile */}
+          {showDetail && selected && (
+            <button
+              onClick={() => setShowDetail(false)}
+              className="lg:hidden flex items-center gap-2 mb-4 text-sm text-blue-600 font-medium"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Retour
+            </button>
+          )}
           {!selected ? (
             <div className="bg-white rounded-xl p-10 text-center border border-dashed border-gray-200">
               <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

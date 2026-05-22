@@ -648,6 +648,7 @@ function Cotisations() {
   const [lotsData, setLotsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
+  const [showDetail, setShowDetail] = useState(false);
   const [filter, setFilter] = useState('Tous');
   const [showNewModal, setShowNewModal] = useState(false);
   const [error, setError] = useState('');
@@ -738,9 +739,9 @@ function Cotisations() {
       )}
 
       {/* Main split layout */}
-      <div className="flex flex-1 min-h-0 gap-0 mt-4 px-6 pb-6">
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0 gap-0 mt-4 px-4 sm:px-6 pb-6">
         {/* Left panel */}
-        <div className="w-[340px] flex-shrink-0 bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col overflow-hidden mr-4">
+        <div className={`w-full lg:w-[340px] lg:flex-shrink-0 bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col overflow-hidden lg:mr-4 ${showDetail ? 'hidden lg:flex' : 'flex'}`}>
           {/* Header */}
           <div className="px-4 py-4 border-b border-gray-100">
             <div className="flex items-center justify-between mb-3">
@@ -783,7 +784,7 @@ function Cotisations() {
                   key={c.id}
                   c={c}
                   isSelected={c.id === selectedId}
-                  onClick={() => setSelectedId(c.id)}
+                  onClick={() => { setSelectedId(c.id); setShowDetail(true); }}
                 />
               ))
             )}
@@ -804,7 +805,19 @@ function Cotisations() {
         </div>
 
         {/* Right panel: detail */}
-        <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className={`flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden ${!showDetail ? 'hidden lg:block' : 'block'}`}>
+          {/* Back button on mobile */}
+          {showDetail && (
+            <button
+              onClick={() => setShowDetail(false)}
+              className="lg:hidden flex items-center gap-2 px-4 pt-4 pb-0 text-sm text-blue-600 font-medium"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Retour
+            </button>
+          )}
           {selectedId ? (
             <CotisationDetail
               key={selectedId}

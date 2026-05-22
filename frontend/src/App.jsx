@@ -14,6 +14,11 @@ import CopropietaireLayout from './components/CopropietaireLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import Residences from './pages/admin/Residences';
 import Gestionnaires from './pages/admin/Gestionnaires';
+import AdminCopropietaires from './pages/admin/AdminCopropietaires';
+import AdminCotisations from './pages/admin/AdminCotisations';
+import AdminTickets from './pages/admin/AdminTickets';
+import AdminBudgets from './pages/admin/AdminBudgets';
+import AdminCommunications from './pages/admin/AdminCommunications';
 
 // Gestionnaire pages
 import GestDashboard from './pages/gestionnaire/GestDashboard';
@@ -62,6 +67,11 @@ function App() {
         <Route index element={<AdminDashboard />} />
         <Route path="residences" element={<Residences />} />
         <Route path="gestionnaires" element={<Gestionnaires />} />
+        <Route path="copropietaires" element={<AdminCopropietaires />} />
+        <Route path="cotisations" element={<AdminCotisations />} />
+        <Route path="tickets" element={<AdminTickets />} />
+        <Route path="budgets" element={<AdminBudgets />} />
+        <Route path="communications" element={<AdminCommunications />} />
       </Route>
 
       {/* Gestionnaire */}

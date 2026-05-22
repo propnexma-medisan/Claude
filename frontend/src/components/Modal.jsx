@@ -25,7 +25,7 @@ function Modal({ isOpen, onClose, title, children, size = 'md' }) {
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-      <div className={`relative bg-white rounded-2xl shadow-2xl w-full ${sizes[size]} max-h-[90vh] flex flex-col`}>
+      <div className={`relative bg-white rounded-2xl shadow-2xl w-full mx-4 sm:mx-auto ${sizes[size]} max-h-[90vh] flex flex-col`}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h2 className="text-lg font-semibold text-gray-800">{title}</h2>
           <button

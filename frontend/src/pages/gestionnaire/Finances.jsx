@@ -148,7 +148,8 @@ function Finances() {
             Ajouter
           </button>
         </div>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[550px]">
           <thead className="bg-gray-50">
             <tr>
               {['Libellé', 'Montant', 'Échéance', 'Exercice', 'Statut', ''].map((h) => (
@@ -183,6 +184,7 @@ function Finances() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Cotisations par lot */}
@@ -190,7 +192,8 @@ function Finances() {
         <div className="px-5 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-800">Cotisations par copropriétaire</h2>
         </div>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[550px]">
           <thead className="bg-gray-50">
             <tr>
               {['Lot', 'Copropriétaire', 'Total dû', 'Payé', 'Impayé', 'Statut'].map((h) => (
@@ -234,6 +237,7 @@ function Finances() {
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Depense form modal */}
