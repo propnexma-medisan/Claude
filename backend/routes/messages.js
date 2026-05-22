@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../database');
 const { authenticate, requireRole } = require('../middleware/auth');
+const { sendMessageBroadcast } = require('../services/email');
 
 const router = express.Router();
 
@@ -71,6 +72,24 @@ router.post('/', authenticate, requireRole('gestionnaire', 'admin'), (req, res) 
       JOIN users u ON m.gestionnaire_id = u.id
       WHERE m.id = ?
     `).get(result.lastInsertRowid);
+
+    // Notify all copropriétaires of the residence (non-blocking)
+    const copropietaires = db.prepare(`
+      SELECT id, nom, prenom, email FROM users
+      WHERE role = 'copropietaire' AND copropriete_id = ? AND is_active = 1
+    `).all(coproId);
+
+    const gestNom = `${req.user.prenom} ${req.user.nom}`;
+    for (const user of copropietaires) {
+      sendMessageBroadcast({
+        to: user.email,
+        prenom: user.prenom,
+        residence: message.copropriete_nom,
+        titre,
+        contenu,
+        gestionnaire_nom: gestNom,
+      }).catch(console.error);
+    }
 
     res.status(201).json(message);
   } catch (err) {

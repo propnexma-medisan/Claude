@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const db = require('../database');
 const { authenticate, requireRole } = require('../middleware/auth');
+const { sendRelance } = require('../services/email');
+
+const APP_URL = process.env.APP_URL || 'https://syndicpro.propnex.ma';
 
 // Helper: generate list of months between date_debut and date_fin (inclusive)
 function generateMonths(dateDebut, dateFin) {
@@ -362,6 +365,31 @@ router.post('/relances', authenticate, (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?)
     `).run(copropriete_id, user_id, cotisation_id || null, type, objet, message);
     const relance = db.prepare('SELECT * FROM relances WHERE id = ?').get(result.lastInsertRowid);
+
+    // Notify the copropriétaire being relanced (non-blocking)
+    const targetUser = db.prepare('SELECT id, nom, prenom, email FROM users WHERE id = ?').get(user_id);
+    if (targetUser) {
+      const copropriete = db.prepare('SELECT nom FROM coproprietes WHERE id = ?').get(copropriete_id);
+      const gestionnaire = db.prepare(`
+        SELECT nom, prenom FROM users WHERE role = 'gestionnaire' AND copropriete_id = ? LIMIT 1
+      `).get(copropriete_id);
+      const cotisation = cotisation_id
+        ? db.prepare('SELECT date_fin FROM cotisations WHERE id = ?').get(cotisation_id)
+        : null;
+
+      sendRelance({
+        to: targetUser.email,
+        prenom: targetUser.prenom,
+        type,
+        objet,
+        message,
+        residence: copropriete ? copropriete.nom : null,
+        date_fin: cotisation ? cotisation.date_fin : null,
+        gestionnaire_nom: gestionnaire ? `${gestionnaire.prenom} ${gestionnaire.nom}` : null,
+        lien: `${APP_URL}/cotisations`,
+      }).catch(console.error);
+    }
+
     res.status(201).json(relance);
   } catch (err) {
     res.status(500).json({ error: err.message });

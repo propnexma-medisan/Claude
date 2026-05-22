@@ -1,6 +1,9 @@
 const express = require('express');
 const db = require('../database');
 const { authenticate } = require('../middleware/auth');
+const { sendAppelFonds } = require('../services/email');
+
+const APP_URL = process.env.APP_URL || 'https://syndicpro.propnex.ma';
 
 const router = express.Router();
 
@@ -428,6 +431,27 @@ router.post('/appels-fonds', authenticate, (req, res) => {
     `).run(copropriete_id, budget_id || null, libelle, motif || null, parseFloat(montant_total), date_appel, date_echeance, req.user.id);
 
     const appel = db.prepare('SELECT * FROM appels_fonds WHERE id = ?').get(result.lastInsertRowid);
+
+    // Notify all copropriétaires of the residence (non-blocking)
+    const copropriete = db.prepare('SELECT nom FROM coproprietes WHERE id = ?').get(copropriete_id);
+    const copropietaires = db.prepare(`
+      SELECT id, nom, prenom, email FROM users
+      WHERE role = 'copropietaire' AND copropriete_id = ? AND is_active = 1
+    `).all(copropriete_id);
+
+    for (const user of copropietaires) {
+      sendAppelFonds({
+        to: user.email,
+        prenom: user.prenom,
+        residence: copropriete ? copropriete.nom : String(copropriete_id),
+        libelle,
+        montant_total: parseFloat(montant_total),
+        date_echeance,
+        motif: motif || null,
+        lien: `${APP_URL}/finances`,
+      }).catch(console.error);
+    }
+
     res.status(201).json(appel);
   } catch (err) {
     res.status(500).json({ error: err.message });

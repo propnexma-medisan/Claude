@@ -1,6 +1,9 @@
 const express = require('express');
 const db = require('../database');
 const { authenticate, requireRole } = require('../middleware/auth');
+const { sendNouveauTicket, sendReponseTicket, sendTicketCloture } = require('../services/email');
+
+const APP_URL = process.env.APP_URL || 'https://syndicpro.propnex.ma';
 
 const router = express.Router();
 
@@ -90,6 +93,27 @@ router.post('/', authenticate, (req, res) => {
       JOIN coproprietes c ON t.copropriete_id = c.id
       WHERE t.id = ?
     `).get(result.lastInsertRowid);
+
+    // Notify gestionnaire of the residence (non-blocking)
+    const gestionnaire = db.prepare(`
+      SELECT id, nom, prenom, email FROM users
+      WHERE role = 'gestionnaire' AND copropriete_id = ?
+      LIMIT 1
+    `).get(copropriete_id);
+
+    if (gestionnaire) {
+      sendNouveauTicket({
+        to: gestionnaire.email,
+        gestionnaire_prenom: gestionnaire.prenom,
+        copro_nom: req.user.nom,
+        copro_prenom: req.user.prenom,
+        titre: ticket.titre,
+        description: ticket.description,
+        categorie: ticket.categorie,
+        priorite: ticket.priorite,
+        lien: `${APP_URL}/tickets/${ticket.id}`,
+      }).catch(console.error);
+    }
 
     res.status(201).json(ticket);
   } catch (err) {
@@ -197,6 +221,53 @@ router.post('/:id/messages', authenticate, (req, res) => {
       JOIN users u ON tm.user_id = u.id
       WHERE tm.id = ?
     `).get(result.lastInsertRowid);
+
+    // Email notifications for ticket messages (non-blocking)
+    const { statut: nouveauStatut } = req.body;
+    const isResolved = nouveauStatut === 'Résolu' || nouveauStatut === 'Fermé';
+
+    if (req.user.role === 'gestionnaire' || req.user.role === 'admin') {
+      // Gestionnaire replied → notify ticket creator (copropriétaire)
+      const createur = db.prepare('SELECT id, nom, prenom, email FROM users WHERE id = ?').get(ticket.createur_id);
+      if (createur) {
+        if (isResolved) {
+          sendTicketCloture({
+            to: createur.email,
+            prenom: createur.prenom,
+            titre: ticket.titre,
+            resolution: message,
+          }).catch(console.error);
+        } else {
+          sendReponseTicket({
+            to: createur.email,
+            prenom: createur.prenom,
+            titre: ticket.titre,
+            reponse: message,
+            auteur_reponse: `${req.user.prenom} ${req.user.nom}`,
+            statut: nouveauStatut || ticket.statut,
+            lien: `${APP_URL}/tickets/${ticket.id}`,
+          }).catch(console.error);
+        }
+      }
+    } else {
+      // Copropriétaire replied → notify gestionnaire
+      const gestionnaire = db.prepare(`
+        SELECT id, nom, prenom, email FROM users
+        WHERE role = 'gestionnaire' AND copropriete_id = ?
+        LIMIT 1
+      `).get(ticket.copropriete_id);
+      if (gestionnaire) {
+        sendReponseTicket({
+          to: gestionnaire.email,
+          prenom: gestionnaire.prenom,
+          titre: ticket.titre,
+          reponse: message,
+          auteur_reponse: `${req.user.prenom} ${req.user.nom}`,
+          statut: nouveauStatut || ticket.statut,
+          lien: `${APP_URL}/tickets/${ticket.id}`,
+        }).catch(console.error);
+      }
+    }
 
     res.status(201).json(msg);
   } catch (err) {

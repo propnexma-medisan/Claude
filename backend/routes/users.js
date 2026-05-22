@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const db = require('../database');
 const { authenticate, requireRole } = require('../middleware/auth');
+const { sendBienvenue } = require('../services/email');
 
 const router = express.Router();
 
@@ -64,7 +65,8 @@ router.post('/', authenticate, requireRole('admin'), async (req, res) => {
       return res.status(409).json({ error: 'Cet email est déjà utilisé' });
     }
 
-    const password_hash = await bcrypt.hash(password, 10);
+    const plainPassword = password;
+    const password_hash = await bcrypt.hash(plainPassword, 10);
 
     const result = db.prepare(`
       INSERT INTO users (nom, prenom, email, password_hash, role, copropriete_id, lot_id, telephone)
@@ -78,6 +80,17 @@ router.post('/', authenticate, requireRole('admin'), async (req, res) => {
       LEFT JOIN coproprietes c ON u.copropriete_id = c.id
       WHERE u.id = ?
     `).get(result.lastInsertRowid);
+
+    // Send welcome email (non-blocking)
+    sendBienvenue({
+      to: user.email,
+      prenom: user.prenom,
+      nom: user.nom,
+      email: user.email,
+      password: plainPassword,
+      role: user.role,
+      residence: user.copropriete_nom || null,
+    }).catch(console.error);
 
     res.status(201).json(user);
   } catch (err) {
