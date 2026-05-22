@@ -1,7 +1,7 @@
 'use strict';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const FROM = process.env.FROM_EMAIL || 'SyndicPro <onboarding@resend.dev>';
+const FROM = process.env.FROM_EMAIL || 'SyndicPro <noreply@propnex.ma>';
 const APP_URL = process.env.APP_URL || 'https://syndicpro.propnex.ma';
 
 // ─── Core send function ───────────────────────────────────────────────────────
