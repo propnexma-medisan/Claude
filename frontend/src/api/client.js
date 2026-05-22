@@ -177,3 +177,13 @@ export const relances = {
   create: (data) => api.post('/relances', data),
   update: (id, data) => api.put(`/relances/${id}`, data),
 };
+
+export const adminApi = {
+  getStats: () => api.get('/admin/stats'),
+  getDashboard: () => api.get('/admin/dashboard'),
+  getCopropietaires: () => api.get('/admin/copropietaires'),
+  getCotisations: () => api.get('/admin/cotisations'),
+  getTickets: () => api.get('/admin/tickets'),
+  getBudgets: () => api.get('/admin/budgets'),
+  getCommunications: () => api.get('/admin/communications'),
+};

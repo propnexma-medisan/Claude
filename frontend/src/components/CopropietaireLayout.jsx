@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, Outlet, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -44,15 +44,38 @@ const navItems = [
 
 function CopropietaireLayout() {
   const { user, logout } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (!user || user.role !== 'copropietaire') {
     return <Navigate to="/login" replace />;
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-100">
+    <div className="flex h-screen bg-gray-100">
+      {/* Mobile backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <div className="w-64 flex-shrink-0 bg-[#1e3a5f] text-white flex flex-col">
+      <aside
+        className={`fixed lg:static inset-y-0 left-0 z-50 w-64 flex-shrink-0 bg-[#1e3a5f] text-white flex flex-col transition-transform duration-300 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
+      >
+        {/* Close button - mobile only */}
+        <button
+          className="lg:hidden absolute top-4 right-4 text-white p-1 rounded hover:bg-white/10"
+          onClick={() => setSidebarOpen(false)}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+
         {/* Logo */}
         <div className="px-6 py-5 border-b border-white/10">
           <div className="flex items-center gap-2">
@@ -85,6 +108,7 @@ function CopropietaireLayout() {
               key={item.to}
               to={item.to}
               end={item.end}
+              onClick={() => setSidebarOpen(false)}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   isActive ? 'bg-green-600 text-white' : 'text-blue-100 hover:bg-white/10'
@@ -118,14 +142,29 @@ function CopropietaireLayout() {
             Déconnexion
           </button>
         </div>
-      </div>
+      </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="p-6 min-h-full">
-          <Outlet />
-        </div>
-      </main>
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Mobile header bar */}
+        <header className="lg:hidden flex items-center gap-3 px-4 py-3 bg-white border-b shadow-sm flex-shrink-0">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <span className="font-semibold text-gray-800">SyndicPro</span>
+        </header>
+
+        <main className="flex-1 overflow-y-auto">
+          <div className="p-4 lg:p-6 min-h-full">
+            <Outlet />
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
