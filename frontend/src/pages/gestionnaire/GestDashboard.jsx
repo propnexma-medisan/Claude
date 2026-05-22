@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { users, tickets, finances } from '../../api/client';
+import { users, tickets, finances, cotisations } from '../../api/client';
+import { Link } from 'react-router-dom';
 
 function fmt(n) {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n || 0);
@@ -9,6 +10,7 @@ function fmt(n) {
 function GestDashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
+  const [alertesCotisations, setAlertesCotisations] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -21,10 +23,12 @@ function GestDashboard() {
       users.byResidence(user.copropriete_id),
       tickets.getAll(),
       finances.getByResidence(user.copropriete_id),
+      cotisations.getAlertes(user.copropriete_id),
     ])
-      .then(([copropietaires, allTickets, fin]) => {
+      .then(([copropietaires, allTickets, fin, alertes]) => {
         const openTickets = allTickets.filter((t) => t.statut === 'Ouvert').length;
         setStats({ nbCopropietaires: copropietaires.length, openTickets, finances: fin });
+        setAlertesCotisations(alertes);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -117,6 +121,55 @@ function GestDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Cotisation alerts */}
+      {alertesCotisations && (alertesCotisations.expirant_bientot?.length > 0 || alertesCotisations.impayes?.length > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {alertesCotisations.expirant_bientot?.length > 0 && (
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-orange-700">
+                    {alertesCotisations.expirant_bientot.length} cotisation(s) expirent bientôt
+                  </p>
+                  <p className="text-xs text-orange-600 mt-0.5">Dans les 60 prochains jours</p>
+                  <Link to="/gestionnaire/cotisations" className="inline-block mt-2 text-xs text-orange-700 underline hover:no-underline font-medium">
+                    Gérer les cotisations
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+          {alertesCotisations.impayes?.length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-lg bg-red-100 text-red-500 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-red-700">
+                    {alertesCotisations.impayes.length} cotisation(s) avec paiements en retard
+                  </p>
+                  <p className="text-xs text-red-600 mt-0.5">
+                    {alertesCotisations.impayes.slice(0, 2).map((c) => `${c.prenom} ${c.nom}`).join(', ')}
+                    {alertesCotisations.impayes.length > 2 ? ` +${alertesCotisations.impayes.length - 2}` : ''}
+                  </p>
+                  <Link to="/gestionnaire/cotisations" className="inline-block mt-2 text-xs text-red-700 underline hover:no-underline font-medium">
+                    Voir les impayés
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {fin && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

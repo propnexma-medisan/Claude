@@ -22,6 +22,7 @@ import Finances from './pages/gestionnaire/Finances';
 import Messages from './pages/gestionnaire/Messages';
 import GestTickets from './pages/gestionnaire/Tickets';
 import Budget from './pages/gestionnaire/Budget';
+import Cotisations from './pages/gestionnaire/Cotisations';
 
 // Copropriétaire pages
 import MonProfil from './pages/copropietaire/MonProfil';
@@ -67,6 +68,7 @@ function App() {
       <Route path="/gestionnaire" element={<GestionnaireLayout />}>
         <Route index element={<GestDashboard />} />
         <Route path="copropietaires" element={<Copropietaires />} />
+        <Route path="cotisations" element={<Cotisations />} />
         <Route path="finances" element={<Finances />} />
         <Route path="budget" element={<Budget />} />
         <Route path="messages" element={<Messages />} />

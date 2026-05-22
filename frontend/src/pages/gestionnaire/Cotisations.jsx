@@ -1,0 +1,840 @@
+import React, { useEffect, useState, useCallback } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import { cotisations, relances, users } from '../../api/client';
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function fmt(n) {
+  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n || 0);
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d + (d.length === 10 ? 'T00:00:00' : '')).toLocaleDateString('fr-FR');
+}
+
+function fmtMonth(mois) {
+  // mois = 'YYYY-MM'
+  if (!mois) return '—';
+  const [y, m] = mois.split('-');
+  const d = new Date(Number(y), Number(m) - 1, 1);
+  return d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+}
+
+function shortMonth(mois) {
+  const [y, m] = mois.split('-');
+  const d = new Date(Number(y), Number(m) - 1, 1);
+  return d.toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '');
+}
+
+function initials(prenom, nom) {
+  return `${prenom?.[0] || ''}${nom?.[0] || ''}`.toUpperCase();
+}
+
+function daysRemaining(dateFin) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const end = new Date(dateFin + 'T00:00:00');
+  return Math.ceil((end - today) / (1000 * 60 * 60 * 24));
+}
+
+function joursLabel(days) {
+  if (days < 0) return { label: `J+${Math.abs(days)}`, cls: 'text-red-600 font-bold' };
+  if (days <= 7) return { label: `J-${days}`, cls: 'text-red-600 font-bold' };
+  if (days <= 30) return { label: `J-${days}`, cls: 'text-orange-500 font-semibold' };
+  if (days <= 60) return { label: `J-${days}`, cls: 'text-yellow-600' };
+  return { label: `J-${days}`, cls: 'text-gray-400' };
+}
+
+const STATUT_COLORS = {
+  Active: 'bg-green-100 text-green-700',
+  Expirée: 'bg-red-100 text-red-700',
+  Suspendue: 'bg-yellow-100 text-yellow-700',
+  Résiliée: 'bg-gray-100 text-gray-600',
+};
+
+const PAIEMENT_COLORS = {
+  Payé: 'bg-green-100 text-green-700 border-green-200',
+  'En attente': 'bg-gray-100 text-gray-500 border-gray-200',
+  'En retard': 'bg-red-100 text-red-600 border-red-200',
+  Partiel: 'bg-orange-100 text-orange-600 border-orange-200',
+};
+
+const PAIEMENT_ICONS = {
+  Payé: '✓',
+  'En attente': '○',
+  'En retard': '⚠',
+  Partiel: '◑',
+};
+
+const RELANCE_TEMPLATES = {
+  'Fin de période': {
+    objet: (c) => `Fin de période de cotisation - ${c.prenom} ${c.nom}`,
+    message: (c) => `Bonjour ${c.prenom} ${c.nom},\n\nVotre période de cotisation se termine le ${fmtDate(c.date_fin)}.\n\nNous vous invitons à prendre contact avec nous pour le renouvellement de votre cotisation.\n\nCordialement,\nVotre gestionnaire`,
+  },
+  Impayé: {
+    objet: (c) => `Paiement en retard - ${c.prenom} ${c.nom}`,
+    message: (c) => `Bonjour ${c.prenom} ${c.nom},\n\nNous constatons que votre cotisation mensuelle de ${fmt(c.montant_mensuel)} présente un retard de paiement.\n\nMerci de régulariser votre situation dans les meilleurs délais.\n\nCordialement,\nVotre gestionnaire`,
+  },
+  Renouvellement: {
+    objet: (c) => `Renouvellement de cotisation - ${c.prenom} ${c.nom}`,
+    message: (c) => `Bonjour ${c.prenom} ${c.nom},\n\nNous vous proposons le renouvellement de votre cotisation pour la prochaine période.\n\nMerci de bien vouloir nous contacter pour convenir des modalités.\n\nCordialement,\nVotre gestionnaire`,
+  },
+};
+
+// ─── Sub-components ────────────────────────────────────────────────────────────
+
+function StatutBadge({ statut }) {
+  return (
+    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUT_COLORS[statut] || 'bg-gray-100 text-gray-600'}`}>
+      {statut}
+    </span>
+  );
+}
+
+function PaiementCell({ p, onUpdate, disabled }) {
+  return (
+    <button
+      disabled={disabled}
+      onClick={() => onUpdate(p)}
+      className={`w-[60px] h-[56px] rounded-lg border text-center text-xs font-medium flex flex-col items-center justify-center gap-0.5 transition-all hover:opacity-80 ${PAIEMENT_COLORS[p.statut] || 'bg-gray-100 text-gray-500 border-gray-200'} ${disabled ? 'cursor-default' : 'cursor-pointer hover:shadow-sm'}`}
+    >
+      <span className="text-base leading-none">{PAIEMENT_ICONS[p.statut] || '○'}</span>
+      <span className="text-[10px] leading-none">{shortMonth(p.mois)}</span>
+    </button>
+  );
+}
+
+// ─── Modal: Update Payment ─────────────────────────────────────────────────────
+function PaiementModal({ paiement, onClose, onSave }) {
+  const [form, setForm] = useState({
+    statut: paiement.statut,
+    date_paiement: paiement.date_paiement || '',
+    mode_paiement: paiement.mode_paiement || '',
+    reference: paiement.reference || '',
+    notes: paiement.notes || '',
+  });
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await onSave(paiement.id, form);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="font-semibold text-gray-800">Mettre à jour le paiement</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <p className="text-sm text-gray-500 mb-1">Mois: <strong className="text-gray-700">{fmtMonth(paiement.mois)}</strong></p>
+            <p className="text-sm text-gray-500">Montant: <strong className="text-gray-700">{fmt(paiement.montant)}</strong></p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Statut</label>
+            <select value={form.statut} onChange={(e) => setForm({ ...form, statut: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              {['En attente', 'Payé', 'En retard', 'Partiel'].map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Date de paiement</label>
+            <input type="date" value={form.date_paiement} onChange={(e) => setForm({ ...form, date_paiement: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Mode de paiement</label>
+            <select value={form.mode_paiement} onChange={(e) => setForm({ ...form, mode_paiement: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="">— Sélectionner —</option>
+              {['Virement', 'Chèque', 'Espèces', 'Prélèvement', 'Carte bancaire'].map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Référence</label>
+            <input type="text" value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="N° de virement, chèque..." />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-gray-100 flex gap-3 justify-end">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-200 rounded-lg hover:bg-gray-50">
+            Annuler
+          </button>
+          <button onClick={handleSave} disabled={saving}
+            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+            {saving ? 'Enregistrement...' : 'Enregistrer'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal: Relance ────────────────────────────────────────────────────────────
+function RelanceModal({ cotisation, onClose, onSave }) {
+  const [type, setType] = useState('Fin de période');
+  const [objet, setObjet] = useState(RELANCE_TEMPLATES['Fin de période'].objet(cotisation));
+  const [message, setMessage] = useState(RELANCE_TEMPLATES['Fin de période'].message(cotisation));
+  const [saving, setSaving] = useState(false);
+
+  function handleTypeChange(t) {
+    setType(t);
+    setObjet(RELANCE_TEMPLATES[t].objet(cotisation));
+    setMessage(RELANCE_TEMPLATES[t].message(cotisation));
+  }
+
+  async function handleSend() {
+    setSaving(true);
+    try {
+      await onSave({ copropriete_id: cotisation.copropriete_id, user_id: cotisation.user_id, cotisation_id: cotisation.id, type, objet, message });
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="font-semibold text-gray-800">Envoyer une relance</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div className="text-sm text-gray-600 bg-blue-50 rounded-lg px-4 py-3">
+            Destinataire: <strong>{cotisation.prenom} {cotisation.nom}</strong>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Type de relance</label>
+            <div className="flex gap-2">
+              {['Fin de période', 'Impayé', 'Renouvellement'].map((t) => (
+                <button key={t} onClick={() => handleTypeChange(t)}
+                  className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${type === t ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 text-gray-600 hover:border-blue-300'}`}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Objet</label>
+            <input type="text" value={objet} onChange={(e) => setObjet(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+            <textarea rows={6} value={message} onChange={(e) => setMessage(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-gray-100 flex gap-3 justify-end">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-200 rounded-lg hover:bg-gray-50">
+            Annuler
+          </button>
+          <button onClick={handleSend} disabled={saving || !objet.trim() || !message.trim()}
+            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            </svg>
+            {saving ? 'Envoi...' : 'Envoyer'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal: New Cotisation ─────────────────────────────────────────────────────
+function NewCotisationModal({ coproprieteId, coproUsers, lots, onClose, onSave }) {
+  const [form, setForm] = useState({
+    user_id: '',
+    lot_id: '',
+    montant_mensuel: '',
+    date_debut: '',
+    date_fin: '',
+    notes: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSave() {
+    if (!form.user_id || !form.montant_mensuel || !form.date_debut || !form.date_fin) {
+      setError('Veuillez remplir tous les champs obligatoires.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      await onSave({ copropriete_id: coproprieteId, ...form, montant_mensuel: parseFloat(form.montant_mensuel) });
+      onClose();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const userLots = lots.filter((l) => {
+    const selectedUser = coproUsers.find((u) => String(u.id) === String(form.user_id));
+    if (!selectedUser) return true;
+    return String(l.id) === String(selectedUser.lot_id) || true;
+  });
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="font-semibold text-gray-800">Nouvelle cotisation</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div className="p-6 space-y-4">
+          {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">{error}</p>}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Copropriétaire <span className="text-red-500">*</span></label>
+            <select value={form.user_id} onChange={(e) => setForm({ ...form, user_id: e.target.value, lot_id: '' })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="">— Sélectionner —</option>
+              {coproUsers.map((u) => (
+                <option key={u.id} value={u.id}>{u.prenom} {u.nom}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Lot</label>
+            <select value={form.lot_id} onChange={(e) => setForm({ ...form, lot_id: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="">— Aucun lot spécifique —</option>
+              {userLots.map((l) => (
+                <option key={l.id} value={l.id}>{l.numero} — {l.type}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Montant mensuel (€) <span className="text-red-500">*</span></label>
+            <input type="number" min="0" step="0.01" value={form.montant_mensuel}
+              onChange={(e) => setForm({ ...form, montant_mensuel: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="350.00" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Début <span className="text-red-500">*</span></label>
+              <input type="month" value={form.date_debut} onChange={(e) => setForm({ ...form, date_debut: e.target.value })}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Fin <span className="text-red-500">*</span></label>
+              <input type="month" value={form.date_fin} onChange={(e) => setForm({ ...form, date_fin: e.target.value })}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-gray-100 flex gap-3 justify-end">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-200 rounded-lg hover:bg-gray-50">
+            Annuler
+          </button>
+          <button onClick={handleSave} disabled={saving}
+            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+            {saving ? 'Création...' : 'Créer la cotisation'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── CotisationRow ────────────────────────────────────────────────────────────
+function CotisationRow({ c, isSelected, onClick }) {
+  const days = daysRemaining(c.date_fin);
+  const { label, cls } = joursLabel(days);
+
+  let rowBg = 'hover:bg-gray-50';
+  if (c.statut === 'Active' && days <= 30 && days >= 0) rowBg = 'bg-orange-50 hover:bg-orange-100';
+  else if (c.statut === 'Expirée') rowBg = 'bg-red-50 hover:bg-red-100';
+  else if (c.dernier_paiement_statut === 'En retard') rowBg = 'bg-red-50 hover:bg-red-100';
+
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full text-left px-4 py-3 border-b border-gray-100 last:border-0 transition-colors ${rowBg} ${isSelected ? 'bg-blue-50 border-l-4 border-l-blue-600' : ''}`}
+    >
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
+          {initials(c.prenom, c.nom)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium text-gray-800">{c.prenom} {c.nom}</span>
+            {c.lot_numero && <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">Lot {c.lot_numero}</span>}
+          </div>
+          <div className="text-xs text-gray-400 mt-0.5">
+            {fmtDate(c.date_debut)} → {fmtDate(c.date_fin)} · {fmt(c.montant_mensuel)}/mois
+          </div>
+        </div>
+        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+          <StatutBadge statut={c.statut} />
+          {c.statut === 'Active' && (
+            <span className={`text-xs ${cls}`}>{label}</span>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+// ─── Detail Panel ────────────────────────────────────────────────────────────
+function CotisationDetail({ cotisationId, coproprieteId, onRefresh }) {
+  const [detail, setDetail] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedPaiement, setSelectedPaiement] = useState(null);
+  const [showRelanceModal, setShowRelanceModal] = useState(false);
+  const [showExtend, setShowExtend] = useState(false);
+  const [newDateFin, setNewDateFin] = useState('');
+  const [showStatutMenu, setShowStatutMenu] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    cotisations.getById(cotisationId)
+      .then(setDetail)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [cotisationId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function handlePaiementSave(id, data) {
+    await cotisations.updatePaiement(id, data);
+    load();
+  }
+
+  async function handleRelanceSave(data) {
+    await relances.create(data);
+    load();
+  }
+
+  async function handleExtend() {
+    if (!newDateFin) return;
+    setSaving(true);
+    try {
+      await cotisations.update(cotisationId, { date_fin: newDateFin });
+      setShowExtend(false);
+      setNewDateFin('');
+      load();
+      onRefresh();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleStatutChange(statut) {
+    setSaving(true);
+    setShowStatutMenu(false);
+    try {
+      await cotisations.update(cotisationId, { statut });
+      load();
+      onRefresh();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-64"><div className="animate-spin w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full" /></div>;
+  }
+
+  if (!detail) return null;
+
+  const days = daysRemaining(detail.date_fin);
+  const { label: jLabel, cls: jCls } = joursLabel(days);
+
+  const paiements = detail.paiements || [];
+  const totalPaye = paiements.filter((p) => p.statut === 'Payé').reduce((s, p) => s + p.montant, 0);
+  const totalAttendu = paiements.reduce((s, p) => s + p.montant, 0);
+  const impayes = paiements.filter((p) => p.statut === 'En retard' || p.statut === 'En attente').length;
+
+  return (
+    <div className="h-full flex flex-col overflow-y-auto">
+      {/* Header */}
+      <div className="px-6 py-5 border-b border-gray-100">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+                {initials(detail.prenom, detail.nom)}
+              </div>
+              <div>
+                <h2 className="font-bold text-gray-800 text-lg">{detail.prenom} {detail.nom}</h2>
+                <p className="text-sm text-gray-500">{detail.email}</p>
+              </div>
+            </div>
+            {detail.lot_numero && (
+              <span className="inline-block mt-1 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">Lot {detail.lot_numero} — {detail.lot_type}</span>
+            )}
+          </div>
+          <div className="text-right flex-shrink-0">
+            <p className="text-2xl font-bold text-gray-800">{fmt(detail.montant_mensuel)}<span className="text-sm font-normal text-gray-500">/mois</span></p>
+            <p className="text-xs text-gray-400 mt-1">{fmtDate(detail.date_debut)} → {fmtDate(detail.date_fin)}</p>
+          </div>
+        </div>
+
+        {/* Status + actions */}
+        <div className="flex items-center gap-3 mt-4 flex-wrap">
+          <div className="relative">
+            <button onClick={() => setShowStatutMenu(!showStatutMenu)}
+              className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors">
+              <StatutBadge statut={detail.statut} />
+              <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {showStatutMenu && (
+              <div className="absolute top-10 left-0 bg-white border border-gray-200 rounded-xl shadow-lg z-20 w-44 py-1">
+                {['Active', 'Expirée', 'Suspendue', 'Résiliée'].map((s) => (
+                  <button key={s} onClick={() => handleStatutChange(s)}
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2">
+                    <StatutBadge statut={s} />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {detail.statut === 'Active' && (
+            <span className={`text-sm font-medium ${jCls}`}>{jLabel}</span>
+          )}
+
+          <button onClick={() => setShowExtend(!showExtend)}
+            className="text-sm px-3 py-1.5 border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors">
+            Prolonger
+          </button>
+
+          <button onClick={() => setShowRelanceModal(true)}
+            className="text-sm px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            </svg>
+            Relance
+          </button>
+        </div>
+
+        {/* Extend form */}
+        {showExtend && (
+          <div className="mt-3 flex items-center gap-3 bg-blue-50 rounded-xl p-3">
+            <span className="text-sm text-gray-600 flex-shrink-0">Nouvelle date de fin :</span>
+            <input type="month" value={newDateFin} onChange={(e) => setNewDateFin(e.target.value)}
+              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <button onClick={handleExtend} disabled={saving || !newDateFin}
+              className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">
+              {saving ? '...' : 'Confirmer'}
+            </button>
+            <button onClick={() => setShowExtend(false)} className="text-gray-400 hover:text-gray-600">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Paiements calendar */}
+      <div className="px-6 py-5 border-b border-gray-100">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-gray-800">Paiements</h3>
+          <div className="flex gap-3 text-xs text-gray-500">
+            <span>{fmt(totalPaye)} payé</span>
+            <span className="text-gray-300">|</span>
+            <span>{fmt(totalAttendu)} total</span>
+            {impayes > 0 && (
+              <>
+                <span className="text-gray-300">|</span>
+                <span className="text-red-500">{impayes} impayé(s)</span>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {paiements.map((p) => (
+            <PaiementCell key={p.id} p={p} onUpdate={setSelectedPaiement} disabled={false} />
+          ))}
+        </div>
+        {/* Legend */}
+        <div className="flex gap-4 mt-3">
+          {Object.entries(PAIEMENT_ICONS).map(([s, icon]) => (
+            <div key={s} className="flex items-center gap-1 text-xs text-gray-500">
+              <span className={`w-4 h-4 rounded text-center text-[10px] flex items-center justify-center border ${PAIEMENT_COLORS[s]}`}>{icon}</span>
+              <span>{s}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Historique relances */}
+      <div className="px-6 py-5">
+        <h3 className="font-semibold text-gray-800 mb-3">Historique des relances</h3>
+        {(detail.relances || []).length === 0 ? (
+          <p className="text-sm text-gray-400">Aucune relance envoyée</p>
+        ) : (
+          <div className="space-y-2">
+            {detail.relances.map((r) => (
+              <div key={r.id} className="bg-gray-50 rounded-xl p-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-medium text-gray-700">{r.objet}</span>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${r.statut === 'Traitée' ? 'bg-green-100 text-green-600' : r.statut === 'Lue' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'}`}>
+                      {r.statut}
+                    </span>
+                    <span className="text-xs text-gray-400">{fmtDate(r.sent_at)}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 line-clamp-2 whitespace-pre-line">{r.message}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Modals */}
+      {selectedPaiement && (
+        <PaiementModal
+          paiement={selectedPaiement}
+          onClose={() => setSelectedPaiement(null)}
+          onSave={handlePaiementSave}
+        />
+      )}
+      {showRelanceModal && (
+        <RelanceModal
+          cotisation={detail}
+          onClose={() => setShowRelanceModal(false)}
+          onSave={handleRelanceSave}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+function Cotisations() {
+  const { user } = useAuth();
+  const [list, setList] = useState([]);
+  const [alertes, setAlertes] = useState({ expirant_bientot: [], impayes: [], expirees: [] });
+  const [coproUsers, setCoproUsers] = useState([]);
+  const [lotsData, setLotsData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState(null);
+  const [filter, setFilter] = useState('Tous');
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [error, setError] = useState('');
+
+  const coproprieteId = user?.copropriete_id;
+
+  const loadAll = useCallback(() => {
+    if (!coproprieteId) return;
+    Promise.all([
+      cotisations.getAll({ copropriete_id: coproprieteId }),
+      cotisations.getAlertes(coproprieteId),
+      users.byResidence(coproprieteId),
+    ])
+      .then(([cotisationList, alerteData, userList]) => {
+        setList(cotisationList);
+        setAlertes(alerteData);
+        const copros = userList.filter((u) => u.role === 'copropietaire');
+        setCoproUsers(copros);
+        // Gather unique lots from user data
+        const lotSet = new Map();
+        userList.forEach((u) => {
+          if (u.lot_id && u.lot_numero) {
+            lotSet.set(u.lot_id, { id: u.lot_id, numero: u.lot_numero, type: u.lot_type || 'Appartement' });
+          }
+        });
+        setLotsData(Array.from(lotSet.values()));
+        if (!selectedId && cotisationList.length > 0) setSelectedId(cotisationList[0].id);
+      })
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [coproprieteId]);
+
+  useEffect(() => { loadAll(); }, [loadAll]);
+
+  async function handleCreate(data) {
+    await cotisations.create(data);
+    loadAll();
+  }
+
+  const expirantCount30 = alertes.expirant_bientot.filter((c) => daysRemaining(c.date_fin) <= 30).length;
+  const impayes30Count = alertes.impayes.length;
+
+  const filtered = list.filter((c) => {
+    if (filter === 'Actives') return c.statut === 'Active';
+    if (filter === 'Expirées') return c.statut === 'Expirée';
+    if (filter === 'Alertes') {
+      const days = daysRemaining(c.date_fin);
+      return (c.statut === 'Active' && days <= 60) || c.statut === 'Expirée' || c.dernier_paiement_statut === 'En retard';
+    }
+    return true;
+  });
+
+  if (!coproprieteId) {
+    return (
+      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-yellow-700">
+        Aucune résidence assignée. Contactez l'administrateur.
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full -m-6">
+      {/* Alert banners */}
+      {(expirantCount30 > 0 || impayes30Count > 0) && (
+        <div className="flex-shrink-0 px-6 pt-4 space-y-2">
+          {expirantCount30 > 0 && (
+            <div className="flex items-center justify-between bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3">
+              <div className="flex items-center gap-2 text-yellow-700 text-sm">
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span><strong>{expirantCount30} cotisation(s)</strong> expire(nt) dans moins de 30 jours</span>
+              </div>
+              <button onClick={() => setFilter('Alertes')} className="text-xs text-yellow-700 underline hover:no-underline">
+                Voir les alertes
+              </button>
+            </div>
+          )}
+          {impayes30Count > 0 && (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+              <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-sm text-red-600"><strong>{impayes30Count} paiement(s)</strong> en retard</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Main split layout */}
+      <div className="flex flex-1 min-h-0 gap-0 mt-4 px-6 pb-6">
+        {/* Left panel */}
+        <div className="w-[340px] flex-shrink-0 bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col overflow-hidden mr-4">
+          {/* Header */}
+          <div className="px-4 py-4 border-b border-gray-100">
+            <div className="flex items-center justify-between mb-3">
+              <h1 className="text-lg font-bold text-gray-800">Cotisations</h1>
+              <div className="flex items-center gap-2">
+                {alertes.expirant_bientot.length > 0 && (
+                  <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-medium">
+                    {alertes.expirant_bientot.length} expirent bientôt
+                  </span>
+                )}
+                {alertes.impayes.length > 0 && (
+                  <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">
+                    {alertes.impayes.length} impayés
+                  </span>
+                )}
+              </div>
+            </div>
+            {/* Filters */}
+            <div className="flex gap-1">
+              {['Tous', 'Actives', 'Expirées', 'Alertes'].map((f) => (
+                <button key={f} onClick={() => setFilter(f)}
+                  className={`text-xs px-2.5 py-1 rounded-full transition-colors ${filter === f ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                  {f}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* List */}
+          <div className="flex-1 overflow-y-auto">
+            {loading ? (
+              <div className="flex justify-center py-12"><div className="animate-spin w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full" /></div>
+            ) : error ? (
+              <p className="px-4 py-6 text-sm text-red-500">{error}</p>
+            ) : filtered.length === 0 ? (
+              <p className="px-4 py-6 text-sm text-gray-400 text-center">Aucune cotisation</p>
+            ) : (
+              filtered.map((c) => (
+                <CotisationRow
+                  key={c.id}
+                  c={c}
+                  isSelected={c.id === selectedId}
+                  onClick={() => setSelectedId(c.id)}
+                />
+              ))
+            )}
+          </div>
+
+          {/* Footer: new button */}
+          <div className="px-4 py-3 border-t border-gray-100">
+            <button
+              onClick={() => setShowNewModal(true)}
+              className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white text-sm font-medium py-2.5 rounded-xl hover:bg-blue-700 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Nouvelle cotisation
+            </button>
+          </div>
+        </div>
+
+        {/* Right panel: detail */}
+        <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          {selectedId ? (
+            <CotisationDetail
+              key={selectedId}
+              cotisationId={selectedId}
+              coproprieteId={coproprieteId}
+              onRefresh={loadAll}
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-gray-400">
+              <svg className="w-12 h-12 mb-3 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <p className="text-sm">Sélectionnez une cotisation</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* New cotisation modal */}
+      {showNewModal && (
+        <NewCotisationModal
+          coproprieteId={coproprieteId}
+          coproUsers={coproUsers}
+          lots={lotsData}
+          onClose={() => setShowNewModal(false)}
+          onSave={handleCreate}
+        />
+      )}
+    </div>
+  );
+}
+
+export default Cotisations;
