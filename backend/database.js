@@ -186,6 +186,47 @@ function initializeDatabase() {
       created_by INTEGER REFERENCES users(id),
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS cotisations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      copropriete_id INTEGER NOT NULL REFERENCES coproprietes(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      lot_id INTEGER REFERENCES lots(id) ON DELETE SET NULL,
+      montant_mensuel REAL NOT NULL,
+      date_debut DATE NOT NULL,
+      date_fin DATE NOT NULL,
+      statut TEXT DEFAULT 'Active' CHECK(statut IN ('Active','Expirée','Suspendue','Résiliée')),
+      notes TEXT,
+      created_by INTEGER REFERENCES users(id),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS cotisation_paiements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      cotisation_id INTEGER NOT NULL REFERENCES cotisations(id) ON DELETE CASCADE,
+      mois TEXT NOT NULL,
+      montant REAL NOT NULL,
+      statut TEXT DEFAULT 'En attente' CHECK(statut IN ('En attente','Payé','En retard','Partiel')),
+      date_paiement DATE,
+      mode_paiement TEXT,
+      reference TEXT,
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(cotisation_id, mois)
+    );
+
+    CREATE TABLE IF NOT EXISTS relances (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      copropriete_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      cotisation_id INTEGER REFERENCES cotisations(id),
+      type TEXT NOT NULL CHECK(type IN ('Fin de période','Impayé','Renouvellement','Bienvenue')),
+      objet TEXT NOT NULL,
+      message TEXT NOT NULL,
+      statut TEXT DEFAULT 'Envoyée' CHECK(statut IN ('Envoyée','Lue','Traitée')),
+      sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   // Seed data if tables are empty
@@ -374,6 +415,62 @@ function seedData() {
   insertUser.run('Admin', 'Système', 'admin@syndic.ma', adminHash, 'admin', null, null, null);
   insertUser.run('Gestionnaire', 'Principal', 'gestionnaire@syndic.ma', gestHash, 'gestionnaire', cp1.lastInsertRowid, null, '06 00 00 00 01');
   insertUser.run('Copropriétaire', 'Demo', 'copro@syndic.ma', coproHash, 'copropietaire', cp1.lastInsertRowid, lot1.lastInsertRowid, '06 00 00 00 02');
+
+  // Seed cotisations for copropietaire demo user
+  // Find the copropietaire user
+  const coproUser = db.prepare("SELECT id FROM users WHERE role = 'copropietaire' LIMIT 1").get();
+  if (coproUser) {
+    const insertCotisation = db.prepare(`
+      INSERT INTO cotisations (copropriete_id, user_id, lot_id, montant_mensuel, date_debut, date_fin, statut, notes, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const insertPaiement = db.prepare(`
+      INSERT INTO cotisation_paiements (cotisation_id, mois, montant, statut, date_paiement)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+
+    // Cotisation expirée 2024
+    insertCotisation.run(
+      cp1.lastInsertRowid,
+      coproUser.id,
+      lot1.lastInsertRowid,
+      350,
+      '2024-01-01',
+      '2024-12-31',
+      'Expirée',
+      'Cotisation annuelle 2024',
+      null
+    );
+
+    // Cotisation active 2025
+    const cotis2025 = insertCotisation.run(
+      cp1.lastInsertRowid,
+      coproUser.id,
+      lot1.lastInsertRowid,
+      380,
+      '2025-01-01',
+      '2025-12-31',
+      'Active',
+      'Cotisation annuelle 2025',
+      null
+    );
+
+    // Generate paiements for active cotisation: Jan 2025 to Dec 2025
+    // Current date context: 2026-05-22, so all months in 2025 are past → all 'Payé'
+    const today = new Date('2026-05-22');
+    for (let m = 1; m <= 12; m++) {
+      const moisStr = `2025-${String(m).padStart(2, '0')}`;
+      const moisDate = new Date(`2025-${String(m).padStart(2, '0')}-01`);
+      // All 2025 months are before today (2026-05-22), mark as Payé
+      insertPaiement.run(
+        cotis2025.lastInsertRowid,
+        moisStr,
+        380,
+        'Payé',
+        `2025-${String(m).padStart(2, '0')}-05`
+      );
+    }
+  }
 
   console.log('Base de données initialisée avec les données de démonstration.');
 }

@@ -160,3 +160,20 @@ export const appelsFonds = {
   update: (id, data) => api.put(`/appels-fonds/${id}`, data),
   delete: (id) => api.delete(`/appels-fonds/${id}`),
 };
+
+export const cotisations = {
+  getAll: (params) => api.get(`/cotisations?${new URLSearchParams(params)}`),
+  getById: (id) => api.get(`/cotisations/${id}`),
+  create: (data) => api.post('/cotisations', data),
+  update: (id, data) => api.put(`/cotisations/${id}`, data),
+  delete: (id) => api.delete(`/cotisations/${id}`),
+  updatePaiement: (id, data) => api.put(`/cotisations/paiements/${id}`, data),
+  getAlertes: (coproprieteId) => api.get(`/cotisations/alertes?copropriete_id=${coproprieteId}`),
+};
+
+export const relances = {
+  getAll: (coproprieteId) => api.get(`/relances?copropriete_id=${coproprieteId}`),
+  getMesRelances: () => api.get('/relances/mes-relances'),
+  create: (data) => api.post('/relances', data),
+  update: (id, data) => api.put(`/relances/${id}`, data),
+};

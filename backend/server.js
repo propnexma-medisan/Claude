@@ -30,6 +30,7 @@ const ticketsRouter = require('./routes/tickets');
 const messagesRouter = require('./routes/messages');
 const financesRouter = require('./routes/finances');
 const budgetsRouter = require('./routes/budgets');
+const cotisationsRouter = require('./routes/cotisations');
 
 app.use('/api/coproprietes', authenticate, copropietesRouter);
 app.use('/api/lots', authenticate, lotsRouter);
@@ -41,6 +42,7 @@ app.use('/api/tickets', ticketsRouter);
 app.use('/api/messages', messagesRouter);
 app.use('/api/finances', financesRouter);
 app.use('/api', budgetsRouter);
+app.use('/api', cotisationsRouter);
 
 // Dashboard stats (admin/gestionnaire)
 app.get('/api/dashboard/stats', authenticate, (req, res) => {
