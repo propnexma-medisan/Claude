@@ -36,14 +36,14 @@ router.get('/:id', (req, res) => {
 // POST create copropriete
 router.post('/', (req, res) => {
   try {
-    const { nom, adresse, syndic_nom, date_creation, notes } = req.body;
+    const { nom, adresse, syndic_nom, date_creation, notes, photo_url } = req.body;
     if (!nom || !adresse || !date_creation) {
       return res.status(400).json({ error: 'Les champs nom, adresse et date_creation sont requis' });
     }
     const result = db.prepare(`
-      INSERT INTO coproprietes (nom, adresse, nb_lots, syndic_nom, date_creation, notes)
-      VALUES (?, ?, 0, ?, ?, ?)
-    `).run(nom, adresse, syndic_nom || null, date_creation, notes || null);
+      INSERT INTO coproprietes (nom, adresse, nb_lots, syndic_nom, date_creation, notes, photo_url)
+      VALUES (?, ?, 0, ?, ?, ?, ?)
+    `).run(nom, adresse, syndic_nom || null, date_creation, notes || null, photo_url || null);
 
     const newCopropriete = db.prepare('SELECT * FROM coproprietes WHERE id = ?').get(result.lastInsertRowid);
     res.status(201).json(newCopropriete);
@@ -55,14 +55,14 @@ router.post('/', (req, res) => {
 // PUT update copropriete
 router.put('/:id', (req, res) => {
   try {
-    const { nom, adresse, syndic_nom, date_creation, notes } = req.body;
+    const { nom, adresse, syndic_nom, date_creation, notes, photo_url } = req.body;
     const existing = db.prepare('SELECT id FROM coproprietes WHERE id = ?').get(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Copropriété non trouvée' });
 
     db.prepare(`
-      UPDATE coproprietes SET nom = ?, adresse = ?, syndic_nom = ?, date_creation = ?, notes = ?
+      UPDATE coproprietes SET nom = ?, adresse = ?, syndic_nom = ?, date_creation = ?, notes = ?, photo_url = ?
       WHERE id = ?
-    `).run(nom, adresse, syndic_nom || null, date_creation, notes || null, req.params.id);
+    `).run(nom, adresse, syndic_nom || null, date_creation, notes || null, photo_url || null, req.params.id);
 
     const updated = db.prepare('SELECT * FROM coproprietes WHERE id = ?').get(req.params.id);
     res.json(updated);
@@ -101,7 +101,7 @@ router.post('/:id/lots', (req, res) => {
     if (!numero || !type) {
       return res.status(400).json({ error: 'Les champs numero et type sont requis' });
     }
-    const validTypes = ['Appartement', 'Commerce', 'Parking', 'Cave'];
+    const validTypes = ['Appartement', 'Studio', 'Commerce', 'Bureau', 'Parking', 'Cave'];
     if (!validTypes.includes(type)) {
       return res.status(400).json({ error: 'Type de lot invalide' });
     }

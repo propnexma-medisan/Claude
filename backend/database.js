@@ -19,6 +19,7 @@ function initializeDatabase() {
       syndic_nom TEXT,
       date_creation TEXT NOT NULL,
       notes TEXT,
+      photo_url TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -26,7 +27,7 @@ function initializeDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       copropriete_id INTEGER NOT NULL,
       numero TEXT NOT NULL,
-      type TEXT NOT NULL CHECK(type IN ('Appartement','Commerce','Parking','Cave')),
+      type TEXT NOT NULL CHECK(type IN ('Appartement','Studio','Commerce','Bureau','Parking','Cave')),
       surface REAL,
       tantiemes INTEGER DEFAULT 0,
       proprietaire_nom TEXT,

@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import Modal from '../../components/Modal';
 import { coproprietes as api, lots as lotsApi } from '../../api/client';
 
-const TYPE_OPTIONS = ['Appartement', 'Commerce', 'Parking', 'Cave'];
+const BASE_URL = import.meta.env.PROD ? '' : 'http://localhost:3001';
+
+const TYPE_OPTIONS = ['Appartement', 'Studio', 'Commerce', 'Bureau', 'Parking', 'Cave'];
 
 const typeColors = {
   Appartement: 'bg-blue-100 text-blue-700',
@@ -11,7 +13,7 @@ const typeColors = {
   Cave: 'bg-amber-100 text-amber-700',
 };
 
-const emptyForm = { nom: '', adresse: '', syndic_nom: '', date_creation: '', notes: '' };
+const emptyForm = { nom: '', adresse: '', syndic_nom: '', date_creation: '', notes: '', photo_url: '' };
 const emptyLotForm = { numero: '', type: 'Appartement', surface: '', tantiemes: '', proprietaire_nom: '', proprietaire_email: '', proprietaire_tel: '' };
 
 function Residences() {
@@ -28,6 +30,7 @@ function Residences() {
   const [editLotId, setEditLotId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [uploading, setUploading] = useState(false);
 
   const load = () => api.getAll().then(setList).catch(() => {}).finally(() => setLoading(false));
 
@@ -40,8 +43,20 @@ function Residences() {
   };
 
   const openNew = () => { setForm(emptyForm); setEditId(null); setShowForm(true); setError(null); };
+  const uploadPhoto = async (file) => {
+    setUploading(true);
+    try {
+      const token = localStorage.getItem('syndic_token');
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch(`${BASE_URL}/api/upload`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd });
+      const data = await res.json();
+      if (data.url) setForm((f) => ({ ...f, photo_url: data.url }));
+    } catch { } finally { setUploading(false); }
+  };
+
   const openEdit = (c) => {
-    setForm({ nom: c.nom, adresse: c.adresse, syndic_nom: c.syndic_nom || '', date_creation: c.date_creation, notes: c.notes || '' });
+    setForm({ nom: c.nom, adresse: c.adresse, syndic_nom: c.syndic_nom || '', date_creation: c.date_creation, notes: c.notes || '', photo_url: c.photo_url || '' });
     setEditId(c.id);
     setShowForm(true);
     setError(null);
@@ -249,6 +264,15 @@ function Residences() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
             <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Photo de la résidence</label>
+            {form.photo_url && (
+              <img src={BASE_URL + form.photo_url} alt="Photo" className="w-full h-32 object-cover rounded-lg mb-2" />
+            )}
+            <input type="file" accept="image/*" onChange={(e) => e.target.files[0] && uploadPhoto(e.target.files[0])}
+              className="w-full text-sm text-gray-500 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100" />
+            {uploading && <p className="text-xs text-gray-400 mt-1">Téléchargement en cours...</p>}
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600">Annuler</button>

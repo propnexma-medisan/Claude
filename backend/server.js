@@ -1,8 +1,22 @@
 require('dotenv').config({ path: __dirname + '/.env' });
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
+const multer = require('multer');
+const fs = require('fs');
 const db = require('./database');
 const { authenticate, requireRole } = require('./middleware/auth');
+
+// Setup upload storage
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname.replace(/\s+/g, '_')),
+});
+const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 }, fileFilter: (req, file, cb) => {
+  cb(null, file.mimetype.startsWith('image/'));
+}});
 
 const app = express();
 const PORT = 3001;
@@ -18,6 +32,15 @@ app.use('/api/auth', authRouter);
 // Health check (public)
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Serve uploaded files
+app.use('/uploads', express.static(uploadDir));
+
+// Upload endpoint (authenticated)
+app.post('/api/upload', authenticate, upload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu' });
+  res.json({ url: `/uploads/${req.file.filename}` });
 });
 
 // All routes below require authentication

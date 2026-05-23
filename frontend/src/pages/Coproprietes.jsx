@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Modal from '../components/Modal';
 import { coproprietes as api, lots as lotsApi } from '../api/client';
 
-const TYPE_OPTIONS = ['Appartement', 'Commerce', 'Parking', 'Cave'];
+const TYPE_OPTIONS = ['Appartement', 'Studio', 'Commerce', 'Bureau', 'Parking', 'Cave'];
 
 const typeColors = {
   Appartement: 'bg-blue-100 text-blue-700',
