@@ -93,23 +93,6 @@ function Login() {
           </button>
         </form>
 
-        <div className="mt-6 pt-4 border-t border-gray-100">
-          <p className="text-xs text-gray-400 text-center">Comptes de démonstration</p>
-          <div className="mt-2 space-y-1 text-xs text-gray-500">
-            <div className="flex justify-between px-2 py-1 bg-gray-50 rounded">
-              <span>admin@syndic.ma</span>
-              <span className="text-gray-400">Admin2024!</span>
-            </div>
-            <div className="flex justify-between px-2 py-1 bg-gray-50 rounded">
-              <span>gestionnaire@syndic.ma</span>
-              <span className="text-gray-400">Gest2024!</span>
-            </div>
-            <div className="flex justify-between px-2 py-1 bg-gray-50 rounded">
-              <span>copro@syndic.ma</span>
-              <span className="text-gray-400">Copro2024!</span>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
