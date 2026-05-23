@@ -46,13 +46,28 @@ router.get('/by-residence/:coproprieteId', authenticate, requireRole('gestionnai
   }
 });
 
-// POST /api/users — admin only, create gestionnaire or copropietaire
-router.post('/', authenticate, requireRole('admin'), async (req, res) => {
+// POST /api/users — admin or gestionnaire (gestionnaire can only create copropietaires for their residence)
+router.post('/', authenticate, async (req, res) => {
   try {
     const { nom, prenom, email, password, role, copropriete_id, lot_id, telephone } = req.body;
 
     if (!nom || !prenom || !email || !password || !role) {
       return res.status(400).json({ error: 'nom, prenom, email, password et role sont requis' });
+    }
+
+    const isAdmin = req.user.role === 'admin';
+    const isGestionnaire = req.user.role === 'gestionnaire';
+
+    // Gestionnaire can only create copropietaires for their own residence
+    if (isGestionnaire) {
+      if (role !== 'copropietaire') {
+        return res.status(403).json({ error: 'Accès refusé : rôle insuffisant' });
+      }
+      if (parseInt(copropriete_id) !== req.user.copropriete_id) {
+        return res.status(403).json({ error: 'Accès refusé à cette résidence' });
+      }
+    } else if (!isAdmin) {
+      return res.status(403).json({ error: 'Accès refusé : rôle insuffisant' });
     }
 
     const validRoles = ['gestionnaire', 'copropietaire', 'admin'];
@@ -156,12 +171,23 @@ router.put('/:id', authenticate, async (req, res) => {
   }
 });
 
-// DELETE /api/users/:id — admin only
-router.delete('/:id', authenticate, requireRole('admin'), (req, res) => {
+// DELETE /api/users/:id — admin or gestionnaire (gestionnaire can only delete copropietaires in their residence)
+router.delete('/:id', authenticate, (req, res) => {
   try {
     const { id } = req.params;
-    const existing = db.prepare('SELECT id FROM users WHERE id = ?').get(id);
+    const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
     if (!existing) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+
+    const isAdmin = req.user.role === 'admin';
+    const isGestionnaire = req.user.role === 'gestionnaire';
+
+    if (isGestionnaire) {
+      if (existing.role !== 'copropietaire' || existing.copropriete_id !== req.user.copropriete_id) {
+        return res.status(403).json({ error: 'Accès refusé' });
+      }
+    } else if (!isAdmin) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
 
     db.prepare('DELETE FROM users WHERE id = ?').run(id);
     res.json({ message: 'Utilisateur supprimé avec succès' });
