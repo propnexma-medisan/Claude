@@ -9,7 +9,7 @@ router.put('/:id', (req, res) => {
     const existing = db.prepare('SELECT * FROM lots WHERE id = ?').get(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Lot non trouvé' });
 
-    const validTypes = ['Appartement', 'Commerce', 'Parking', 'Cave'];
+    const validTypes = ['Appartement', 'Studio', 'Commerce', 'Bureau', 'Parking', 'Cave'];
     if (type && !validTypes.includes(type)) {
       return res.status(400).json({ error: 'Type de lot invalide' });
     }
