@@ -113,19 +113,24 @@ router.post('/', authenticate, async (req, res) => {
   }
 });
 
-// PUT /api/users/:id — admin or self (profile update)
+// PUT /api/users/:id — admin, self, or gestionnaire (for their own copropietaires)
 router.put('/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
     const isSelf = req.user.id === parseInt(id);
     const isAdmin = req.user.role === 'admin';
-
-    if (!isSelf && !isAdmin) {
-      return res.status(403).json({ error: 'Accès refusé' });
-    }
+    const isGestionnaire = req.user.role === 'gestionnaire';
 
     const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
     if (!existing) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+
+    const isGestionnaireManaging = isGestionnaire &&
+      existing.role === 'copropietaire' &&
+      existing.copropriete_id === req.user.copropriete_id;
+
+    if (!isSelf && !isAdmin && !isGestionnaireManaging) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
 
     const { nom, prenom, email, telephone, password, copropriete_id, lot_id, role, is_active } = req.body;
 
@@ -134,10 +139,11 @@ router.put('/:id', authenticate, async (req, res) => {
       password_hash = await bcrypt.hash(password, 10);
     }
 
-    // Non-admin users can only update their own basic info
+    // Only admin can change role, copropriete, or active status
+    // Gestionnaire can change nom, prenom, email, telephone, lot_id for their copropietaires
     const newRole = isAdmin ? (role || existing.role) : existing.role;
     const newCoproId = isAdmin ? (copropriete_id !== undefined ? copropriete_id : existing.copropriete_id) : existing.copropriete_id;
-    const newLotId = isAdmin ? (lot_id !== undefined ? lot_id : existing.lot_id) : existing.lot_id;
+    const newLotId = (isAdmin || isGestionnaireManaging) ? (lot_id !== undefined ? lot_id : existing.lot_id) : existing.lot_id;
     const newIsActive = isAdmin ? (is_active !== undefined ? is_active : existing.is_active) : existing.is_active;
 
     db.prepare(`
