@@ -1,3 +1,4 @@
+import { formatMAD } from '../../utils/currency';
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { cotisations, relances } from '../../api/client';
@@ -5,7 +6,7 @@ import { cotisations, relances } from '../../api/client';
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function fmt(n) {
-  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n || 0);
+  return formatMAD(n || 0);
 }
 
 function fmtDate(d) {

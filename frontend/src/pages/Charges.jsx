@@ -1,3 +1,4 @@
+import { formatMAD } from '../utils/currency';
 import React, { useEffect, useState } from 'react';
 import Modal from '../components/Modal';
 import { charges as api, coproprietes as coproApi } from '../api/client';
@@ -18,7 +19,7 @@ const paiementColors = {
 };
 
 function fmt(n) {
-  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n || 0);
+  return formatMAD(n || 0);
 }
 
 function fmtDate(d) {
@@ -243,11 +244,11 @@ function Charges() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Montant total (€) *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Montant total (Dhs) *</label>
               <input required type="number" step="0.01" value={form.montant_total} onChange={(e) => setForm({ ...form, montant_total: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="5000" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Budget annuel (€)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Budget annuel (Dhs)</label>
               <input type="number" step="0.01" value={form.budget_annuel} onChange={(e) => setForm({ ...form, budget_annuel: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="20000" />
             </div>
             <div>

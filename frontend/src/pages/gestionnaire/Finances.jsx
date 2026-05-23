@@ -1,10 +1,11 @@
+import { formatMAD } from '../../utils/currency';
 import React, { useEffect, useState } from 'react';
 import Modal from '../../components/Modal';
 import { useAuth } from '../../contexts/AuthContext';
 import { finances, charges as chargesApi } from '../../api/client';
 
 function fmt(n) {
-  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n || 0);
+  return formatMAD(n || 0);
 }
 
 function fmtDate(d) {

@@ -1,3 +1,4 @@
+import { formatMAD } from '../../utils/currency';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { budgets as budgetsApi, depenses as depensesApi, appelsFonds as appelsFondsApi } from '../../api/client';
@@ -246,7 +247,7 @@ function TabBudgets({ coproprieteId }) {
                     <span className="font-bold text-gray-800">{b.annee}</span>
                     <StatutBadge statut={b.statut} />
                   </div>
-                  <div className="text-sm text-gray-500">{fmt(b.total_budget)} €</div>
+                  <div className="text-sm text-gray-500">{formatMAD(b.total_budget)}</div>
                   {b.statut === 'Brouillon' && (
                     <button
                       onClick={(e) => { e.stopPropagation(); deleteBudget(b.id); }}
@@ -320,7 +321,7 @@ function BudgetDetail({ budget, onUpdateLigne, onModifierStatut }) {
         <div className="flex items-center gap-3">
           <span className="text-xl font-bold text-gray-800">Budget {budget.annee}</span>
           <StatutBadge statut={budget.statut} />
-          <span className="text-sm text-gray-500">{fmt(totalAnnuel)} € total</span>
+          <span className="text-sm text-gray-500">{formatMAD(totalAnnuel)} total</span>
         </div>
         <button
           onClick={onModifierStatut}
@@ -503,7 +504,7 @@ function TabDepenses({ coproprieteId }) {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <p className="text-xs text-gray-500 mb-1">Total dépensé</p>
-          <p className="text-2xl font-bold text-gray-800">{fmt(totalDepense)} €</p>
+          <p className="text-2xl font-bold text-gray-800">{formatMAD(totalDepense)}</p>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <p className="text-xs text-gray-500 mb-1">Nb factures</p>
@@ -511,7 +512,7 @@ function TabDepenses({ coproprieteId }) {
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <p className="text-xs text-gray-500 mb-1">Moyenne / mois</p>
-          <p className="text-2xl font-bold text-gray-800">{fmt(moyenneMois)} €</p>
+          <p className="text-2xl font-bold text-gray-800">{formatMAD(moyenneMois)}</p>
         </div>
       </div>
 
@@ -546,7 +547,7 @@ function TabDepenses({ coproprieteId }) {
                   <td className="px-4 py-3 text-gray-800 font-medium">{d.libelle}</td>
                   <td className="px-4 py-3 text-gray-500">{d.fournisseur || '—'}</td>
                   <td className="px-4 py-3 text-gray-500 font-mono text-xs">{d.numero_facture || '—'}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-gray-800">{fmt(d.montant)} €</td>
+                  <td className="px-4 py-3 text-right font-semibold text-gray-800">{formatMAD(d.montant)}</td>
                   <td className="px-4 py-3 text-right">
                     <button onClick={() => { setEditingDepense(d); setShowModal(true); }} className="text-blue-500 hover:text-blue-700 mr-3">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
@@ -562,7 +563,7 @@ function TabDepenses({ coproprieteId }) {
               <tfoot>
                 <tr className="bg-gray-50 border-t-2 border-gray-200 font-semibold">
                   <td colSpan={5} className="px-4 py-3 text-gray-600">Total</td>
-                  <td className="px-4 py-3 text-right text-gray-800">{fmt(totalDepense)} €</td>
+                  <td className="px-4 py-3 text-right text-gray-800">{formatMAD(totalDepense)}</td>
                   <td></td>
                 </tr>
               </tfoot>
@@ -635,7 +636,7 @@ function DepenseModal({ depense, coproprieteId, budgetsList, onClose, onSaved })
               <input type="date" required className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form.date_depense} onChange={e => setForm(f => ({ ...f, date_depense: e.target.value }))} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Montant (€) *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Montant (Dhs) *</label>
               <input type="number" required step="0.01" min="0" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form.montant} onChange={e => setForm(f => ({ ...f, montant: e.target.value }))} placeholder="0.00" />
             </div>
           </div>
@@ -749,15 +750,15 @@ function TabSynthese({ coproprieteId }) {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div className="bg-white rounded-lg border border-gray-200 p-4">
               <p className="text-xs text-gray-500 mb-1">Budget total</p>
-              <p className="text-xl font-bold text-gray-800">{fmt(totBudget)} €</p>
+              <p className="text-xl font-bold text-gray-800">{formatMAD(totBudget)}</p>
             </div>
             <div className="bg-white rounded-lg border border-gray-200 p-4">
               <p className="text-xs text-gray-500 mb-1">Consommé</p>
-              <p className="text-xl font-bold text-orange-600">{fmt(totConsomme)} €</p>
+              <p className="text-xl font-bold text-orange-600">{formatMAD(totConsomme)}</p>
             </div>
             <div className="bg-white rounded-lg border border-gray-200 p-4">
               <p className="text-xs text-gray-500 mb-1">Restant</p>
-              <p className={`text-xl font-bold ${totRestant < 0 ? 'text-red-600' : 'text-green-600'}`}>{fmt(totRestant)} €</p>
+              <p className={`text-xl font-bold ${totRestant < 0 ? 'text-red-600' : 'text-green-600'}`}>{formatMAD(totRestant)}</p>
             </div>
             <div className="bg-white rounded-lg border border-gray-200 p-4">
               <p className="text-xs text-gray-500 mb-1">% Consommé</p>
@@ -788,9 +789,9 @@ function TabSynthese({ coproprieteId }) {
                   return (
                     <tr key={row.categorie} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-gray-800 font-medium">{row.categorie}</td>
-                      <td className="px-4 py-3 text-right text-gray-600">{fmt(row.budget_annuel)} €</td>
-                      <td className="px-4 py-3 text-right text-gray-800">{fmt(row.consomme)} €</td>
-                      <td className={`px-4 py-3 text-right ${restantColor}`}>{fmt(row.restant)} €</td>
+                      <td className="px-4 py-3 text-right text-gray-600">{formatMAD(row.budget_annuel)}</td>
+                      <td className="px-4 py-3 text-right text-gray-800">{formatMAD(row.consomme)}</td>
+                      <td className={`px-4 py-3 text-right ${restantColor}`}>{formatMAD(row.restant)}</td>
                       <td className="px-4 py-3">
                         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                           <div
@@ -807,9 +808,9 @@ function TabSynthese({ coproprieteId }) {
               <tfoot>
                 <tr className="bg-gray-50 border-t-2 border-gray-200 font-semibold">
                   <td className="px-4 py-3 text-gray-700">TOTAL</td>
-                  <td className="px-4 py-3 text-right text-gray-800">{fmt(totBudget)} €</td>
-                  <td className="px-4 py-3 text-right text-orange-600">{fmt(totConsomme)} €</td>
-                  <td className={`px-4 py-3 text-right ${totRestant < 0 ? 'text-red-600' : 'text-green-600'}`}>{fmt(totRestant)} €</td>
+                  <td className="px-4 py-3 text-right text-gray-800">{formatMAD(totBudget)}</td>
+                  <td className="px-4 py-3 text-right text-orange-600">{formatMAD(totConsomme)}</td>
+                  <td className={`px-4 py-3 text-right ${totRestant < 0 ? 'text-red-600' : 'text-green-600'}`}>{formatMAD(totRestant)}</td>
                   <td className="px-4 py-3">
                     <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                       <div
@@ -922,7 +923,7 @@ function TabAppelsFonds({ coproprieteId }) {
         <div className="flex gap-4">
           <div className="bg-white rounded-lg border border-gray-200 px-4 py-3">
             <p className="text-xs text-gray-500">En cours</p>
-            <p className="text-lg font-bold text-blue-600">{fmt(totalEnCours)} €</p>
+            <p className="text-lg font-bold text-blue-600">{formatMAD(totalEnCours)}</p>
           </div>
         </div>
         <button
@@ -961,7 +962,7 @@ function TabAppelsFonds({ coproprieteId }) {
                   <td className="px-4 py-3 text-gray-500 max-w-[150px] truncate">{a.motif || '—'}</td>
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{a.date_appel}</td>
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{a.date_echeance}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-gray-800">{fmt(a.montant_total)} €</td>
+                  <td className="px-4 py-3 text-right font-semibold text-gray-800">{formatMAD(a.montant_total)}</td>
                   <td className="px-4 py-3 text-center">
                     <select
                       className="text-xs border border-gray-200 rounded px-2 py-1"
@@ -1052,7 +1053,7 @@ function AppelFondsModal({ appel, coproprieteId, budgetsList, onClose, onSaved }
             <textarea rows={2} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form.motif} onChange={e => setForm(f => ({ ...f, motif: e.target.value }))} placeholder="Raison de l'appel de fonds" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Montant total (€) *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Montant total (Dhs) *</label>
             <input type="number" required step="0.01" min="0" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form.montant_total} onChange={e => setForm(f => ({ ...f, montant_total: e.target.value }))} placeholder="0.00" />
           </div>
           <div className="grid grid-cols-2 gap-4">

@@ -1,3 +1,4 @@
+import { formatMAD } from '../../utils/currency';
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { cotisations, relances, users } from '../../api/client';
@@ -5,7 +6,7 @@ import { cotisations, relances, users } from '../../api/client';
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function fmt(n) {
-  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n || 0);
+  return formatMAD(n || 0);
 }
 
 function fmtDate(d) {
@@ -333,7 +334,7 @@ function NewCotisationModal({ coproprieteId, coproUsers, lots, onClose, onSave }
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Montant mensuel (€) <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Montant mensuel (Dhs) <span className="text-red-500">*</span></label>
             <input type="number" min="0" step="0.01" value={form.montant_mensuel}
               onChange={(e) => setForm({ ...form, montant_mensuel: e.target.value })}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"

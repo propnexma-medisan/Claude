@@ -1,8 +1,9 @@
+import { formatMAD } from '../../utils/currency';
 import React, { useEffect, useState, useMemo } from 'react';
 import { adminApi } from '../../api/client';
 
 function fmt(n) {
-  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n || 0);
+  return formatMAD(n || 0);
 }
 
 function fmtDate(d) {
@@ -251,7 +252,7 @@ function AdminCopropietaires() {
                             <p className="font-semibold text-gray-700 mb-2 text-xs uppercase tracking-wider">Cotisation</p>
                             {row.montant_mensuel ? (
                               <>
-                                <p className="text-gray-600 font-medium">{new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(row.montant_mensuel)}/mois</p>
+                                <p className="text-gray-600 font-medium">{formatMAD(row.montant_mensuel)}/mois</p>
                                 <p className="text-gray-500 text-xs">Du {fmtDate(row.date_debut)} au {fmtDate(row.date_fin)}</p>
                                 {row.dernier_paiement_mois && (
                                   <p className="text-gray-500 text-xs mt-1">Dernier paiement : {row.dernier_paiement_mois} — <span className={row.dernier_paiement_statut === 'Payé' ? 'text-green-600' : 'text-red-500'}>{row.dernier_paiement_statut}</span></p>

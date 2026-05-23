@@ -1,10 +1,11 @@
+import { formatMAD } from '../../utils/currency';
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { users, tickets, finances, cotisations } from '../../api/client';
 import { Link } from 'react-router-dom';
 
 function fmt(n) {
-  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n || 0);
+  return formatMAD(n || 0);
 }
 
 function GestDashboard() {
