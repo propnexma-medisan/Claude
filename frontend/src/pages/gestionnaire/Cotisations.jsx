@@ -412,7 +412,7 @@ function CotisationRow({ c, isSelected, onClick }) {
 }
 
 // ─── Detail Panel ────────────────────────────────────────────────────────────
-function CotisationDetail({ cotisationId, coproprieteId, onRefresh }) {
+function CotisationDetail({ cotisationId, coproprieteId, onRefresh, onDelete }) {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedPaiement, setSelectedPaiement] = useState(null);
@@ -544,6 +544,13 @@ function CotisationDetail({ cotisationId, coproprieteId, onRefresh }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
             </svg>
             Relance
+          </button>
+
+          <button onClick={() => {
+            if (confirm('Supprimer cette cotisation et tous ses paiements ?')) onDelete(cotisationId);
+          }}
+            className="text-sm px-3 py-1.5 border border-red-200 text-red-500 rounded-lg hover:bg-red-50 transition-colors">
+            Supprimer
           </button>
         </div>
 
@@ -689,6 +696,17 @@ function Cotisations() {
     loadAll();
   }
 
+  async function handleDelete(id) {
+    try {
+      await cotisations.delete(id);
+      setSelectedId(null);
+      setShowDetail(false);
+      loadAll();
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
   const expirantCount30 = alertes.expirant_bientot.filter((c) => daysRemaining(c.date_fin) <= 30).length;
   const impayes30Count = alertes.impayes.length;
 
@@ -825,6 +843,7 @@ function Cotisations() {
               cotisationId={selectedId}
               coproprieteId={coproprieteId}
               onRefresh={loadAll}
+              onDelete={handleDelete}
             />
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-gray-400">

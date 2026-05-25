@@ -100,6 +100,35 @@ router.get('/:coproprieteId', authenticate, (req, res) => {
       ORDER BY l.numero ASC
     `).all(coproprieteId, coproprieteId);
 
+    // Cotisations with paiements totals
+    const cotisationsList = db.prepare(`
+      SELECT c.*,
+        u.nom, u.prenom, u.email,
+        l.numero as lot_numero, l.type as lot_type,
+        COALESCE(SUM(cp.montant), 0) as total_attendu,
+        COALESCE(SUM(CASE WHEN cp.statut = 'Payé' THEN cp.montant ELSE 0 END), 0) as cot_paye,
+        COALESCE(SUM(CASE WHEN cp.statut != 'Payé' THEN cp.montant ELSE 0 END), 0) as cot_impaye
+      FROM cotisations c
+      JOIN users u ON c.user_id = u.id
+      LEFT JOIN lots l ON c.lot_id = l.id
+      LEFT JOIN cotisation_paiements cp ON cp.cotisation_id = c.id
+      WHERE c.copropriete_id = ?
+      GROUP BY c.id
+      ORDER BY c.statut ASC, c.date_debut DESC
+    `).all(coproprieteId);
+
+    // Real depenses from depenses table
+    const depensesList = db.prepare(`
+      SELECT * FROM depenses
+      WHERE copropriete_id = ?
+      ORDER BY date_depense DESC
+    `).all(coproprieteId);
+
+    const total_cot_attendu = cotisationsList.reduce((s, c) => s + c.total_attendu, 0);
+    const total_cot_paye = cotisationsList.reduce((s, c) => s + c.cot_paye, 0);
+    const total_cot_impaye = cotisationsList.reduce((s, c) => s + c.cot_impaye, 0);
+    const total_depenses_realisees = depensesList.reduce((s, d) => s + d.montant, 0);
+
     const total_charges = totalChargesRow.total;
     const total_paye = totalPayeRow.total;
     const total_impaye = total_charges - total_paye;
@@ -113,6 +142,12 @@ router.get('/:coproprieteId', authenticate, (req, res) => {
       taux_recouvrement: total_charges > 0 ? Math.round((total_paye / total_charges) * 100) : 0,
       depenses,
       cotisations_par_lot: cotisations,
+      cotisations_list: cotisationsList,
+      depenses_list: depensesList,
+      total_cot_attendu,
+      total_cot_paye,
+      total_cot_impaye,
+      total_depenses_realisees,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
