@@ -275,6 +275,8 @@ router.delete('/cotisations/:id', authenticate, (req, res) => {
     if (req.user.role === 'copropietaire') return res.status(403).json({ error: 'Accès refusé' });
     const existing = db.prepare('SELECT id FROM cotisations WHERE id = ?').get(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Cotisation introuvable' });
+    // Nullify foreign key in relances before deleting (no CASCADE on that FK)
+    db.prepare('UPDATE relances SET cotisation_id = NULL WHERE cotisation_id = ?').run(req.params.id);
     db.prepare('DELETE FROM cotisations WHERE id = ?').run(req.params.id);
     res.json({ success: true });
   } catch (err) {
