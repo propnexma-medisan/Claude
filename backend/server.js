@@ -14,8 +14,9 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname.replace(/\s+/g, '_')),
 });
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 }, fileFilter: (req, file, cb) => {
-  cb(null, file.mimetype.startsWith('image/'));
+const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 }, fileFilter: (req, file, cb) => {
+  const allowed = file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf';
+  cb(null, allowed);
 }});
 
 const app = express();

@@ -248,4 +248,7 @@ function seedAdmin() {
 
 initializeDatabase();
 
+// Migrations: add columns that may not exist on older DBs
+try { db.exec('ALTER TABLE depenses ADD COLUMN justificatif_url TEXT'); } catch {}
+
 module.exports = db;

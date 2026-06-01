@@ -318,7 +318,7 @@ router.get('/depenses', authenticate, (req, res) => {
 // POST /api/depenses
 router.post('/depenses', authenticate, (req, res) => {
   try {
-    const { copropriete_id, budget_id, categorie, libelle, montant, date_depense, fournisseur, numero_facture, notes } = req.body;
+    const { copropriete_id, budget_id, categorie, libelle, montant, date_depense, fournisseur, numero_facture, notes, justificatif_url } = req.body;
     if (!copropriete_id || !categorie || !libelle || montant === undefined || !date_depense) {
       return res.status(400).json({ error: 'Champs requis manquants' });
     }
@@ -327,9 +327,9 @@ router.post('/depenses', authenticate, (req, res) => {
     }
 
     const result = db.prepare(`
-      INSERT INTO depenses (copropriete_id, budget_id, categorie, libelle, montant, date_depense, fournisseur, numero_facture, notes, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(copropriete_id, budget_id || null, categorie, libelle, parseFloat(montant), date_depense, fournisseur || null, numero_facture || null, notes || null, req.user.id);
+      INSERT INTO depenses (copropriete_id, budget_id, categorie, libelle, montant, date_depense, fournisseur, numero_facture, notes, justificatif_url, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(copropriete_id, budget_id || null, categorie, libelle, parseFloat(montant), date_depense, fournisseur || null, numero_facture || null, notes || null, justificatif_url || null, req.user.id);
 
     const depense = db.prepare('SELECT * FROM depenses WHERE id = ?').get(result.lastInsertRowid);
     res.status(201).json(depense);
@@ -347,12 +347,12 @@ router.put('/depenses/:id', authenticate, (req, res) => {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
-    const { categorie, libelle, montant, date_depense, fournisseur, numero_facture, notes, budget_id } = req.body;
+    const { categorie, libelle, montant, date_depense, fournisseur, numero_facture, notes, budget_id, justificatif_url } = req.body;
 
     db.prepare(`
       UPDATE depenses SET
         categorie = ?, libelle = ?, montant = ?, date_depense = ?,
-        fournisseur = ?, numero_facture = ?, notes = ?, budget_id = ?
+        fournisseur = ?, numero_facture = ?, notes = ?, budget_id = ?, justificatif_url = ?
       WHERE id = ?
     `).run(
       categorie !== undefined ? categorie : depense.categorie,
@@ -363,6 +363,7 @@ router.put('/depenses/:id', authenticate, (req, res) => {
       numero_facture !== undefined ? numero_facture : depense.numero_facture,
       notes !== undefined ? notes : depense.notes,
       budget_id !== undefined ? budget_id : depense.budget_id,
+      justificatif_url !== undefined ? justificatif_url : depense.justificatif_url,
       req.params.id
     );
 
