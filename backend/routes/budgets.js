@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../database');
 const { authenticate } = require('../middleware/auth');
 const { sendAppelFonds } = require('../services/email');
+const { canGestionnaireAccessResidence } = require('../utils/access');
 
 const APP_URL = process.env.APP_URL || 'https://syndicpro.propnex.ma';
 
@@ -26,7 +27,7 @@ const CATEGORIES_BUDGET = [
 // Helper: check access to a copropriete_id
 function canAccessCopropriete(user, coproprieteId) {
   if (user.role === 'admin') return true;
-  if (user.role === 'gestionnaire') return user.copropriete_id === parseInt(coproprieteId);
+  if (user.role === 'gestionnaire') return canGestionnaireAccessResidence(user.id, coproprieteId);
   return false;
 }
 

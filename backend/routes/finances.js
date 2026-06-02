@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../database');
 const { authenticate, requireRole } = require('../middleware/auth');
+const { canGestionnaireAccessResidence } = require('../utils/access');
 
 const router = express.Router();
 
@@ -43,7 +44,7 @@ router.get('/:coproprieteId', authenticate, (req, res) => {
     const { coproprieteId } = req.params;
 
     // Access control
-    if (req.user.role === 'gestionnaire' && req.user.copropriete_id !== parseInt(coproprieteId)) {
+    if (req.user.role === 'gestionnaire' && !canGestionnaireAccessResidence(req.user.id, coproprieteId)) {
       return res.status(403).json({ error: 'Accès refusé à cette résidence' });
     }
     if (req.user.role === 'copropietaire' && req.user.copropriete_id !== parseInt(coproprieteId)) {
