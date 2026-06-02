@@ -22,6 +22,8 @@ const CATEGORIES_BUDGET = [
 const MONTHS_KEYS = ['jan', 'fev', 'mar', 'avr', 'mai', 'jun', 'jul', 'aou', 'sep', 'oct', 'nov', 'dec'];
 const MONTHS_LABELS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
 
+const BASE_URL = import.meta.env.PROD ? '' : 'http://localhost:3001';
+
 function fmt(n) {
   if (n === null || n === undefined) return '0';
   return Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -530,13 +532,14 @@ function TabDepenses({ coproprieteId }) {
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Fournisseur</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">N° Facture</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Montant</th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Justif.</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {depensesList.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-10 text-gray-400">Aucune dépense trouvée</td>
+                  <td colSpan={8} className="text-center py-10 text-gray-400">Aucune dépense trouvée</td>
                 </tr>
               ) : depensesList.map(d => (
                 <tr key={d.id} className="hover:bg-gray-50">
@@ -548,6 +551,19 @@ function TabDepenses({ coproprieteId }) {
                   <td className="px-4 py-3 text-gray-500">{d.fournisseur || '—'}</td>
                   <td className="px-4 py-3 text-gray-500 font-mono text-xs">{d.numero_facture || '—'}</td>
                   <td className="px-4 py-3 text-right font-semibold text-gray-800">{formatMAD(d.montant)}</td>
+                  <td className="px-4 py-3 text-center">
+                    {d.justificatif_url ? (
+                      <a href={BASE_URL + d.justificatif_url} target="_blank" rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-blue-500 hover:text-blue-700 text-xs">
+                        {d.justificatif_url.endsWith('.pdf') ? (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        )}
+                        Voir
+                      </a>
+                    ) : <span className="text-gray-300 text-xs">—</span>}
+                  </td>
                   <td className="px-4 py-3 text-right">
                     <button onClick={() => { setEditingDepense(d); setShowModal(true); }} className="text-blue-500 hover:text-blue-700 mr-3">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
@@ -564,7 +580,7 @@ function TabDepenses({ coproprieteId }) {
                 <tr className="bg-gray-50 border-t-2 border-gray-200 font-semibold">
                   <td colSpan={5} className="px-4 py-3 text-gray-600">Total</td>
                   <td className="px-4 py-3 text-right text-gray-800">{formatMAD(totalDepense)}</td>
-                  <td></td>
+                  <td></td><td></td>
                 </tr>
               </tfoot>
             )}
@@ -599,8 +615,22 @@ function DepenseModal({ depense, coproprieteId, budgetsList, onClose, onSaved })
     fournisseur: depense?.fournisseur || '',
     numero_facture: depense?.numero_facture || '',
     notes: depense?.notes || '',
+    justificatif_url: depense?.justificatif_url || '',
   });
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const uploadJustificatif = async (file) => {
+    setUploading(true);
+    try {
+      const token = localStorage.getItem('syndic_token');
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch(`${BASE_URL}/api/upload`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd });
+      const data = await res.json();
+      if (data.url) setForm(f => ({ ...f, justificatif_url: data.url }));
+    } catch { } finally { setUploading(false); }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -671,8 +701,28 @@ function DepenseModal({ depense, coproprieteId, budgetsList, onClose, onSaved })
             <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
             <textarea rows={2} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Pièce justificative <span className="text-gray-400 font-normal">(optionnel — photo ou PDF)</span>
+            </label>
+            {form.justificatif_url && (
+              <div className="flex items-center gap-2 mb-2 p-2 bg-gray-50 rounded-lg">
+                {form.justificatif_url.endsWith('.pdf') ? (
+                  <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                ) : (
+                  <img src={BASE_URL + form.justificatif_url} alt="Justificatif" className="w-16 h-12 object-cover rounded" />
+                )}
+                <a href={BASE_URL + form.justificatif_url} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline flex-1 truncate">Voir le fichier</a>
+                <button type="button" onClick={() => setForm(f => ({ ...f, justificatif_url: '' }))} className="text-gray-400 hover:text-red-500 text-xs">Supprimer</button>
+              </div>
+            )}
+            <input type="file" accept="image/*,application/pdf"
+              onChange={e => e.target.files[0] && uploadJustificatif(e.target.files[0])}
+              className="w-full text-sm text-gray-500 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+            {uploading && <p className="text-xs text-gray-400 mt-1">Téléchargement en cours...</p>}
+          </div>
           <div className="flex gap-3 pt-2">
-            <button type="submit" disabled={saving} className="flex-1 bg-blue-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
+            <button type="submit" disabled={saving || uploading} className="flex-1 bg-blue-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
               {saving ? 'Enregistrement...' : isEdit ? 'Modifier' : 'Créer'}
             </button>
             <button type="button" onClick={onClose} className="flex-1 bg-gray-100 text-gray-700 rounded-lg py-2.5 text-sm font-medium hover:bg-gray-200 transition-colors">
