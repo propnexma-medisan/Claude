@@ -9,22 +9,22 @@ function fmt(n) {
 }
 
 function GestDashboard() {
-  const { user } = useAuth();
+  const { user, selectedCoproId, coproprietes } = useAuth();
   const [stats, setStats] = useState(null);
   const [alertesCotisations, setAlertesCotisations] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!user?.copropriete_id) {
+    if (!selectedCoproId) {
       setLoading(false);
       return;
     }
     Promise.all([
-      users.byResidence(user.copropriete_id),
-      tickets.getAll(),
-      finances.getByResidence(user.copropriete_id),
-      cotisations.getAlertes(user.copropriete_id),
+      users.byResidence(selectedCoproId),
+      tickets.getAll(selectedCoproId),
+      finances.getByResidence(selectedCoproId),
+      cotisations.getAlertes(selectedCoproId),
     ])
       .then(([copropietaires, allTickets, fin, alertes]) => {
         const openTickets = allTickets.filter((t) => t.statut === 'Ouvert').length;
@@ -33,7 +33,7 @@ function GestDashboard() {
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [user]);
+  }, [selectedCoproId]);
 
   if (loading) {
     return (
@@ -43,7 +43,7 @@ function GestDashboard() {
     );
   }
 
-  if (!user?.copropriete_id) {
+  if (!selectedCoproId) {
     return (
       <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-yellow-700">
         <p className="font-medium">Aucune résidence assignée</p>
@@ -63,7 +63,9 @@ function GestDashboard() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Tableau de bord</h1>
-        <p className="text-sm text-gray-500 mt-1">{user.copropriete_nom}</p>
+        <p className="text-sm text-gray-500 mt-1">
+          {coproprietes.find((c) => c.id === selectedCoproId)?.nom || user.copropriete_nom}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

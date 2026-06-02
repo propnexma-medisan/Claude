@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../database');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { sendNouveauTicket, sendReponseTicket, sendTicketCloture } = require('../services/email');
+const { canGestionnaireAccessResidence } = require('../utils/access');
 
 const APP_URL = process.env.APP_URL || 'https://syndicpro.propnex.ma';
 
@@ -25,16 +26,34 @@ router.get('/', authenticate, (req, res) => {
         ORDER BY t.created_at DESC
       `).all();
     } else if (req.user.role === 'gestionnaire') {
-      tickets = db.prepare(`
-        SELECT t.*, u.nom as createur_nom, u.prenom as createur_prenom,
-               c.nom as copropriete_nom, l.numero as lot_numero
-        FROM tickets t
-        JOIN users u ON t.createur_id = u.id
-        JOIN coproprietes c ON t.copropriete_id = c.id
-        LEFT JOIN lots l ON t.lot_id = l.id
-        WHERE t.copropriete_id = ?
-        ORDER BY t.created_at DESC
-      `).all(req.user.copropriete_id);
+      const { copropriete_id } = req.query;
+      if (copropriete_id) {
+        if (!canGestionnaireAccessResidence(req.user.id, copropriete_id)) {
+          return res.status(403).json({ error: 'Accès refusé à cette résidence' });
+        }
+        tickets = db.prepare(`
+          SELECT t.*, u.nom as createur_nom, u.prenom as createur_prenom,
+                 c.nom as copropriete_nom, l.numero as lot_numero
+          FROM tickets t
+          JOIN users u ON t.createur_id = u.id
+          JOIN coproprietes c ON t.copropriete_id = c.id
+          LEFT JOIN lots l ON t.lot_id = l.id
+          WHERE t.copropriete_id = ?
+          ORDER BY t.created_at DESC
+        `).all(copropriete_id);
+      } else {
+        tickets = db.prepare(`
+          SELECT t.*, u.nom as createur_nom, u.prenom as createur_prenom,
+                 c.nom as copropriete_nom, l.numero as lot_numero
+          FROM tickets t
+          JOIN users u ON t.createur_id = u.id
+          JOIN coproprietes c ON t.copropriete_id = c.id
+          LEFT JOIN lots l ON t.lot_id = l.id
+          JOIN gestionnaire_residences gr ON t.copropriete_id = gr.copropriete_id
+          WHERE gr.gestionnaire_id = ?
+          ORDER BY t.created_at DESC
+        `).all(req.user.id);
+      }
     } else {
       // copropietaire
       tickets = db.prepare(`
@@ -128,8 +147,8 @@ router.put('/:id', authenticate, requireRole('gestionnaire', 'admin'), (req, res
     const existing = db.prepare('SELECT * FROM tickets WHERE id = ?').get(id);
     if (!existing) return res.status(404).json({ error: 'Ticket non trouvé' });
 
-    // Gestionnaire can only update tickets in their residence
-    if (req.user.role === 'gestionnaire' && existing.copropriete_id !== req.user.copropriete_id) {
+    // Gestionnaire can only update tickets in their residences
+    if (req.user.role === 'gestionnaire' && !canGestionnaireAccessResidence(req.user.id, existing.copropriete_id)) {
       return res.status(403).json({ error: 'Accès refusé à ce ticket' });
     }
 
@@ -170,7 +189,7 @@ router.get('/:id/messages', authenticate, (req, res) => {
     if (req.user.role === 'copropietaire' && ticket.createur_id !== req.user.id) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
-    if (req.user.role === 'gestionnaire' && ticket.copropriete_id !== req.user.copropriete_id) {
+    if (req.user.role === 'gestionnaire' && !canGestionnaireAccessResidence(req.user.id, ticket.copropriete_id)) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
@@ -203,7 +222,7 @@ router.post('/:id/messages', authenticate, (req, res) => {
     if (req.user.role === 'copropietaire' && ticket.createur_id !== req.user.id) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
-    if (req.user.role === 'gestionnaire' && ticket.copropriete_id !== req.user.copropriete_id) {
+    if (req.user.role === 'gestionnaire' && !canGestionnaireAccessResidence(req.user.id, ticket.copropriete_id)) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 

@@ -1155,10 +1155,10 @@ const TABS = [
 ];
 
 export default function Budget() {
-  const { user } = useAuth();
+  const { selectedCoproId } = useAuth();
   const [activeTab, setActiveTab] = useState('budgets');
 
-  const coproprieteId = user?.copropriete_id;
+  const coproprieteId = selectedCoproId;
 
   if (!coproprieteId) {
     return (

@@ -108,7 +108,7 @@ export const users = {
 
 // Tickets
 export const tickets = {
-  getAll: () => api.get('/tickets'),
+  getAll: (coproprieteId) => api.get(coproprieteId ? `/tickets?copropriete_id=${coproprieteId}` : '/tickets'),
   create: (data) => api.post('/tickets', data),
   update: (id, data) => api.put(`/tickets/${id}`, data),
   getMessages: (id) => api.get(`/tickets/${id}/messages`),
@@ -117,7 +117,7 @@ export const tickets = {
 
 // Messages de diffusion
 export const messages = {
-  getAll: () => api.get('/messages'),
+  getAll: (coproprieteId) => api.get(coproprieteId ? `/messages?copropriete_id=${coproprieteId}` : '/messages'),
   create: (data) => api.post('/messages', data),
   delete: (id) => api.delete(`/messages/${id}`),
 };

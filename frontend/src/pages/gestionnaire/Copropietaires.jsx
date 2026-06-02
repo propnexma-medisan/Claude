@@ -12,7 +12,7 @@ const paiementColors = {
 };
 
 function Copropietaires() {
-  const { user } = useAuth();
+  const { user, selectedCoproId } = useAuth();
   const [list, setList] = useState([]);
   const [lots, setLots] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,17 +23,17 @@ function Copropietaires() {
   const [error, setError] = useState(null);
 
   const load = () => {
-    if (!user?.copropriete_id) { setLoading(false); return; }
+    if (!selectedCoproId) { setLoading(false); return; }
     Promise.all([
-      users.byResidence(user.copropriete_id),
-      coproApi.getLots(user.copropriete_id),
+      users.byResidence(selectedCoproId),
+      coproApi.getLots(selectedCoproId),
     ])
       .then(([u, l]) => { setList(u); setLots(l); })
       .catch(() => {})
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [user]);
+  useEffect(() => { load(); }, [selectedCoproId]);
 
   const openNew = () => { setForm(emptyForm); setEditId(null); setShowForm(true); setError(null); };
   const openEdit = (u) => {
@@ -51,7 +51,7 @@ function Copropietaires() {
       const payload = {
         ...form,
         role: 'copropietaire',
-        copropriete_id: user.copropriete_id,
+        copropriete_id: selectedCoproId,
       };
       if (editId && !payload.password) delete payload.password;
 

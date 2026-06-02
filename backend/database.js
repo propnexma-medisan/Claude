@@ -251,4 +251,23 @@ initializeDatabase();
 // Migrations: add columns that may not exist on older DBs
 try { db.exec('ALTER TABLE depenses ADD COLUMN justificatif_url TEXT'); } catch {}
 
+// Junction table: gestionnaire → multiple residences
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS gestionnaire_residences (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    gestionnaire_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    copropriete_id INTEGER NOT NULL REFERENCES coproprietes(id) ON DELETE CASCADE,
+    UNIQUE(gestionnaire_id, copropriete_id)
+  )`);
+} catch {}
+
+// Backfill existing single-residence assignments
+try {
+  db.exec(`
+    INSERT OR IGNORE INTO gestionnaire_residences (gestionnaire_id, copropriete_id)
+    SELECT id, copropriete_id FROM users
+    WHERE role = 'gestionnaire' AND copropriete_id IS NOT NULL
+  `);
+} catch {}
+
 module.exports = db;

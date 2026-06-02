@@ -33,7 +33,7 @@ const emptyDepenseForm = {
 const CATEGORIES = ['Entretien', 'Réparation', 'Nettoyage', 'Sécurité', 'Assurance', 'Honoraires', 'Eau', 'Électricité', 'Ascenseur', 'Espaces verts', 'Autre'];
 
 function Finances() {
-  const { user } = useAuth();
+  const { user, selectedCoproId } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -46,14 +46,14 @@ function Finances() {
   const [activeTab, setActiveTab] = useState('cotisations');
 
   const load = () => {
-    if (!user?.copropriete_id) { setLoading(false); return; }
-    finances.getByResidence(user.copropriete_id)
+    if (!selectedCoproId) { setLoading(false); return; }
+    finances.getByResidence(selectedCoproId)
       .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [user]);
+  useEffect(() => { load(); }, [selectedCoproId]);
 
   const openNewDepense = () => {
     setDepenseForm({ ...emptyDepenseForm, date_depense: new Date().toISOString().slice(0, 10) });
@@ -95,7 +95,7 @@ function Finances() {
     setSaving(true);
     setFormError(null);
     try {
-      const payload = { ...depenseForm, copropriete_id: user.copropriete_id, montant: parseFloat(depenseForm.montant) };
+      const payload = { ...depenseForm, copropriete_id: selectedCoproId, montant: parseFloat(depenseForm.montant) };
       if (editDepenseId) {
         await depensesApi.update(editDepenseId, payload);
       } else {

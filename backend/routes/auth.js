@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const db = require('../database');
 const { authenticate, signToken } = require('../middleware/auth');
+const { getGestionnaireResidences } = require('../utils/access');
 
 const router = express.Router();
 
@@ -33,6 +34,7 @@ router.post('/login', (req, res) => {
     const token = signToken(user);
 
     const { password_hash, ...safeUser } = user;
+    safeUser.coproprietes = user.role === 'gestionnaire' ? getGestionnaireResidences(user.id) : [];
 
     res.json({ token, user: safeUser });
   } catch (err) {
@@ -55,6 +57,7 @@ router.get('/me', authenticate, (req, res) => {
       return res.status(401).json({ error: 'Utilisateur introuvable' });
     }
 
+    user.coproprietes = user.role === 'gestionnaire' ? getGestionnaireResidences(user.id) : [];
     res.json(user);
   } catch (err) {
     res.status(500).json({ error: err.message });

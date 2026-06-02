@@ -649,7 +649,7 @@ function CotisationDetail({ cotisationId, coproprieteId, onRefresh, onDelete }) 
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 function Cotisations() {
-  const { user } = useAuth();
+  const { user, selectedCoproId } = useAuth();
   const [list, setList] = useState([]);
   const [alertes, setAlertes] = useState({ expirant_bientot: [], impayes: [], expirees: [] });
   const [coproUsers, setCoproUsers] = useState([]);
@@ -661,7 +661,7 @@ function Cotisations() {
   const [showNewModal, setShowNewModal] = useState(false);
   const [error, setError] = useState('');
 
-  const coproprieteId = user?.copropriete_id;
+  const coproprieteId = selectedCoproId;
 
   const loadAll = useCallback(() => {
     if (!coproprieteId) return;

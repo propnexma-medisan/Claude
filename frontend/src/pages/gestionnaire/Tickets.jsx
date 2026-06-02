@@ -22,7 +22,7 @@ const prioriteColors = {
 };
 
 function Tickets() {
-  const { user } = useAuth();
+  const { selectedCoproId } = useAuth();
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
@@ -35,9 +35,12 @@ function Tickets() {
   const [filterPriorite, setFilterPriorite] = useState('');
   const [error, setError] = useState(null);
 
-  const load = () => ticketsApi.getAll().then(setList).catch(() => {}).finally(() => setLoading(false));
+  const load = () => {
+    if (!selectedCoproId) { setLoading(false); return; }
+    ticketsApi.getAll(selectedCoproId).then(setList).catch(() => {}).finally(() => setLoading(false));
+  };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [selectedCoproId]);
 
   const openTicket = (t) => {
     setSelected(t);
@@ -77,7 +80,7 @@ function Tickets() {
     return true;
   });
 
-  if (!user?.copropriete_id) {
+  if (!selectedCoproId) {
     return <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-yellow-700">Aucune résidence assignée.</div>;
   }
 

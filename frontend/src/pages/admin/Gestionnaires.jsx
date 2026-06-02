@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Modal from '../../components/Modal';
 import { users, coproprietes as coproApi } from '../../api/client';
 
-const emptyForm = { nom: '', prenom: '', email: '', password: '', copropriete_id: '', telephone: '' };
+const emptyForm = { nom: '', prenom: '', email: '', password: '', copropriete_ids: [], telephone: '' };
 
 function Gestionnaires() {
   const [list, setList] = useState([]);
@@ -26,10 +26,22 @@ function Gestionnaires() {
 
   const openNew = () => { setForm(emptyForm); setEditId(null); setShowForm(true); setError(null); };
   const openEdit = (u) => {
-    setForm({ nom: u.nom, prenom: u.prenom, email: u.email, password: '', copropriete_id: u.copropriete_id || '', telephone: u.telephone || '' });
+    const coproIds = u.coproprietes?.length > 0
+      ? u.coproprietes.map((c) => c.id)
+      : (u.copropriete_id ? [u.copropriete_id] : []);
+    setForm({ nom: u.nom, prenom: u.prenom, email: u.email, password: '', copropriete_ids: coproIds, telephone: u.telephone || '' });
     setEditId(u.id);
     setShowForm(true);
     setError(null);
+  };
+
+  const toggleResidence = (id) => {
+    setForm((f) => ({
+      ...f,
+      copropriete_ids: f.copropriete_ids.includes(id)
+        ? f.copropriete_ids.filter((x) => x !== id)
+        : [...f.copropriete_ids, id],
+    }));
   };
 
   const save = async (e) => {
@@ -37,7 +49,7 @@ function Gestionnaires() {
     setSaving(true);
     setError(null);
     try {
-      const payload = { ...form, role: 'gestionnaire' };
+      const payload = { ...form, role: 'gestionnaire', copropriete_id: form.copropriete_ids[0] || null };
       if (editId && !payload.password) delete payload.password;
 
       if (editId) {
@@ -65,8 +77,6 @@ function Gestionnaires() {
     }
   };
 
-  const getCoproName = (id) => copros.find((c) => c.id === id)?.nom || '—';
-
   return (
     <div>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
@@ -87,7 +97,7 @@ function Gestionnaires() {
           <table className="w-full text-sm min-w-[600px]">
             <thead className="bg-gray-50">
               <tr>
-                {['Gestionnaire', 'Email', 'Téléphone', 'Résidence assignée', 'Statut', ''].map((h) => (
+                {['Gestionnaire', 'Email', 'Téléphone', 'Résidences assignées', 'Statut', ''].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{h}</th>
                 ))}
               </tr>
@@ -111,10 +121,14 @@ function Gestionnaires() {
                   <td className="px-4 py-3 text-gray-600">{u.email}</td>
                   <td className="px-4 py-3 text-gray-600">{u.telephone || '—'}</td>
                   <td className="px-4 py-3">
-                    {u.copropriete_id ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
-                        {getCoproName(u.copropriete_id)}
-                      </span>
+                    {u.coproprietes?.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {u.coproprietes.map((c) => (
+                          <span key={c.id} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                            {c.nom}
+                          </span>
+                        ))}
+                      </div>
                     ) : <span className="text-gray-400 text-xs">Non assigné</span>}
                   </td>
                   <td className="px-4 py-3">
@@ -161,11 +175,24 @@ function Gestionnaires() {
             <input value={form.telephone} onChange={(e) => setForm({ ...form, telephone: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="06 00 00 00 00" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Résidence assignée</label>
-            <select value={form.copropriete_id} onChange={(e) => setForm({ ...form, copropriete_id: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
-              <option value="">— Non assigné —</option>
-              {copros.map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
-            </select>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Résidences assignées</label>
+            <div className="border border-gray-200 rounded-lg p-3 max-h-40 overflow-y-auto space-y-2">
+              {copros.length === 0 && <p className="text-xs text-gray-400">Aucune résidence disponible</p>}
+              {copros.map((c) => (
+                <label key={c.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5">
+                  <input
+                    type="checkbox"
+                    checked={form.copropriete_ids.includes(c.id)}
+                    onChange={() => toggleResidence(c.id)}
+                    className="w-4 h-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
+                  />
+                  <span className="text-sm text-gray-700">{c.nom}</span>
+                </label>
+              ))}
+            </div>
+            {form.copropriete_ids.length > 0 && (
+              <p className="text-xs text-purple-600 mt-1">{form.copropriete_ids.length} résidence(s) sélectionnée(s)</p>
+            )}
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600">Annuler</button>

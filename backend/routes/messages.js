@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../database');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { sendMessageBroadcast } = require('../services/email');
+const { canGestionnaireAccessResidence } = require('../utils/access');
 
 const router = express.Router();
 
@@ -19,14 +20,30 @@ router.get('/', authenticate, (req, res) => {
         ORDER BY m.created_at DESC
       `).all();
     } else if (req.user.role === 'gestionnaire') {
-      messages = db.prepare(`
-        SELECT m.*, c.nom as copropriete_nom, u.nom as gestionnaire_nom, u.prenom as gestionnaire_prenom
-        FROM messages_diffusion m
-        JOIN coproprietes c ON m.copropriete_id = c.id
-        JOIN users u ON m.gestionnaire_id = u.id
-        WHERE m.copropriete_id = ?
-        ORDER BY m.created_at DESC
-      `).all(req.user.copropriete_id);
+      const { copropriete_id } = req.query;
+      if (copropriete_id) {
+        if (!canGestionnaireAccessResidence(req.user.id, copropriete_id)) {
+          return res.status(403).json({ error: 'Accès refusé à cette résidence' });
+        }
+        messages = db.prepare(`
+          SELECT m.*, c.nom as copropriete_nom, u.nom as gestionnaire_nom, u.prenom as gestionnaire_prenom
+          FROM messages_diffusion m
+          JOIN coproprietes c ON m.copropriete_id = c.id
+          JOIN users u ON m.gestionnaire_id = u.id
+          WHERE m.copropriete_id = ?
+          ORDER BY m.created_at DESC
+        `).all(copropriete_id);
+      } else {
+        messages = db.prepare(`
+          SELECT m.*, c.nom as copropriete_nom, u.nom as gestionnaire_nom, u.prenom as gestionnaire_prenom
+          FROM messages_diffusion m
+          JOIN coproprietes c ON m.copropriete_id = c.id
+          JOIN users u ON m.gestionnaire_id = u.id
+          JOIN gestionnaire_residences gr ON m.copropriete_id = gr.copropriete_id
+          WHERE gr.gestionnaire_id = ?
+          ORDER BY m.created_at DESC
+        `).all(req.user.id);
+      }
     } else {
       // copropietaire
       messages = db.prepare(`
@@ -54,7 +71,10 @@ router.post('/', authenticate, requireRole('gestionnaire', 'admin'), (req, res) 
       return res.status(400).json({ error: 'titre et contenu sont requis' });
     }
 
-    const coproId = req.user.role === 'gestionnaire' ? req.user.copropriete_id : (copropriete_id || req.user.copropriete_id);
+    let coproId = req.user.role === 'gestionnaire' ? (copropriete_id || req.user.copropriete_id) : (copropriete_id || req.user.copropriete_id);
+    if (req.user.role === 'gestionnaire' && coproId && !canGestionnaireAccessResidence(req.user.id, coproId)) {
+      return res.status(403).json({ error: 'Accès refusé à cette résidence' });
+    }
 
     if (!coproId) {
       return res.status(400).json({ error: 'copropriete_id requis' });
@@ -104,8 +124,8 @@ router.delete('/:id', authenticate, requireRole('gestionnaire', 'admin'), (req, 
     const existing = db.prepare('SELECT * FROM messages_diffusion WHERE id = ?').get(id);
     if (!existing) return res.status(404).json({ error: 'Message non trouvé' });
 
-    // Gestionnaire can only delete their own residence's messages
-    if (req.user.role === 'gestionnaire' && existing.copropriete_id !== req.user.copropriete_id) {
+    // Gestionnaire can only delete messages from their residences
+    if (req.user.role === 'gestionnaire' && !canGestionnaireAccessResidence(req.user.id, existing.copropriete_id)) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 

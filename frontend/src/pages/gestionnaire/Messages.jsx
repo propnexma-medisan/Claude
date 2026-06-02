@@ -10,7 +10,7 @@ function fmtDate(d) {
 const emptyForm = { titre: '', contenu: '' };
 
 function Messages() {
-  const { user } = useAuth();
+  const { selectedCoproId } = useAuth();
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -18,16 +18,19 @@ function Messages() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
-  const load = () => messagesApi.getAll().then(setList).catch(() => {}).finally(() => setLoading(false));
+  const load = () => {
+    if (!selectedCoproId) { setLoading(false); return; }
+    messagesApi.getAll(selectedCoproId).then(setList).catch(() => {}).finally(() => setLoading(false));
+  };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [selectedCoproId]);
 
   const submit = async (e) => {
     e.preventDefault();
     setSaving(true);
     setError(null);
     try {
-      const created = await messagesApi.create(form);
+      const created = await messagesApi.create({ ...form, copropriete_id: selectedCoproId });
       setList((l) => [created, ...l]);
       setForm(emptyForm);
       setShowForm(false);
@@ -48,7 +51,7 @@ function Messages() {
     }
   };
 
-  if (!user?.copropriete_id) {
+  if (!selectedCoproId) {
     return <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-yellow-700">Aucune résidence assignée.</div>;
   }
 

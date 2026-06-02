@@ -70,7 +70,7 @@ const navItems = [
 ];
 
 function GestionnaireLayout() {
-  const { user, logout } = useAuth();
+  const { user, logout, selectedCoproId, setSelectedCoproId, coproprietes } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (!user || user.role !== 'gestionnaire') {
@@ -113,10 +113,30 @@ function GestionnaireLayout() {
             </div>
             <div>
               <p className="font-bold text-sm leading-tight">SyndicPro</p>
-              <p className="text-xs text-blue-300">{user.copropriete_nom || 'Ma résidence'}</p>
+              <p className="text-xs text-blue-300">
+                {coproprietes.length > 1
+                  ? `${coproprietes.length} résidences`
+                  : (coproprietes[0]?.nom || user.copropriete_nom || 'Ma résidence')}
+              </p>
             </div>
           </div>
         </div>
+
+        {/* Residence picker (only when multiple residences) */}
+        {coproprietes.length > 1 && (
+          <div className="px-4 py-2.5 border-b border-white/10">
+            <p className="text-xs text-blue-300 mb-1">Résidence active</p>
+            <select
+              value={selectedCoproId || ''}
+              onChange={(e) => setSelectedCoproId(parseInt(e.target.value))}
+              className="w-full bg-white/10 text-white text-xs rounded-lg px-2 py-1.5 border border-white/20 focus:outline-none focus:ring-1 focus:ring-blue-400 cursor-pointer"
+            >
+              {coproprietes.map((c) => (
+                <option key={c.id} value={c.id} className="text-gray-800 bg-white">{c.nom}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Role badge */}
         <div className="px-4 py-3 border-b border-white/10">
