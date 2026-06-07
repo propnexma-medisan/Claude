@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database');
+const { canGestionnaireAccessResidence } = require('../utils/access');
 
 // PUT update lot
 router.put('/:id', (req, res) => {
@@ -8,6 +9,9 @@ router.put('/:id', (req, res) => {
     const { numero, type, surface, tantiemes, proprietaire_nom, proprietaire_email, proprietaire_tel } = req.body;
     const existing = db.prepare('SELECT * FROM lots WHERE id = ?').get(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Lot non trouvé' });
+    if (req.user.role === 'gestionnaire' && !canGestionnaireAccessResidence(req.user.id, existing.copropriete_id)) {
+      return res.status(403).json({ error: 'Accès refusé à cette résidence' });
+    }
 
     const validTypes = ['Appartement', 'Studio', 'Commerce', 'Bureau', 'Parking', 'Cave'];
     if (type && !validTypes.includes(type)) {
@@ -41,6 +45,9 @@ router.delete('/:id', (req, res) => {
   try {
     const existing = db.prepare('SELECT * FROM lots WHERE id = ?').get(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Lot non trouvé' });
+    if (req.user.role === 'gestionnaire' && !canGestionnaireAccessResidence(req.user.id, existing.copropriete_id)) {
+      return res.status(403).json({ error: 'Accès refusé à cette résidence' });
+    }
 
     db.prepare('DELETE FROM lots WHERE id = ?').run(req.params.id);
 

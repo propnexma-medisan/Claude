@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database');
+const { canGestionnaireAccessResidence } = require('../utils/access');
 
 // GET all coproprietes
 router.get('/', (req, res) => {
@@ -97,6 +98,9 @@ router.get('/:id/lots', (req, res) => {
 // POST create lot for a copropriete
 router.post('/:id/lots', (req, res) => {
   try {
+    if (req.user.role === 'gestionnaire' && !canGestionnaireAccessResidence(req.user.id, req.params.id)) {
+      return res.status(403).json({ error: 'Accès refusé à cette résidence' });
+    }
     const { numero, type, surface, tantiemes, proprietaire_nom, proprietaire_email, proprietaire_tel } = req.body;
     if (!numero || !type) {
       return res.status(400).json({ error: 'Les champs numero et type sont requis' });

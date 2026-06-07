@@ -28,6 +28,7 @@ import Messages from './pages/gestionnaire/Messages';
 import GestTickets from './pages/gestionnaire/Tickets';
 import Budget from './pages/gestionnaire/Budget';
 import Cotisations from './pages/gestionnaire/Cotisations';
+import Lots from './pages/gestionnaire/Lots';
 
 // Copropriétaire pages
 import MonProfil from './pages/copropietaire/MonProfil';
@@ -83,6 +84,7 @@ function App() {
         <Route path="budget" element={<Budget />} />
         <Route path="messages" element={<Messages />} />
         <Route path="tickets" element={<GestTickets />} />
+        <Route path="lots" element={<Lots />} />
       </Route>
 
       {/* Copropriétaire */}
