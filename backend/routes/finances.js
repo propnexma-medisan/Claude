@@ -54,11 +54,13 @@ router.get('/:coproprieteId', authenticate, (req, res) => {
     const copropriete = db.prepare('SELECT * FROM coproprietes WHERE id = ?').get(coproprieteId);
     if (!copropriete) return res.status(404).json({ error: 'Résidence non trouvée' });
 
-    // Budget annuel (sum of budget_annuel from charges of current year)
+    // Budget annuel from budget_lignes (what the Budget page writes)
     const currentYear = new Date().getFullYear();
     const budgetRow = db.prepare(`
-      SELECT COALESCE(SUM(budget_annuel), 0) as budget_annuel
-      FROM charges WHERE copropriete_id = ? AND exercice = ?
+      SELECT COALESCE(SUM(bl.montant_annuel), 0) as budget_annuel
+      FROM budget_lignes bl
+      JOIN budgets b ON bl.budget_id = b.id
+      WHERE b.copropriete_id = ? AND b.annee = ?
     `).get(coproprieteId, currentYear);
 
     // Total charges

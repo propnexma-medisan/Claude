@@ -57,7 +57,7 @@ function GestDashboard() {
   }
 
   const fin = stats?.finances;
-  const budgetRestant = fin ? (fin.budget_annuel - fin.total_charges) : 0;
+  const budgetRestant = fin ? (fin.budget_annuel - fin.total_depenses_realisees) : 0;
 
   return (
     <div>
@@ -99,7 +99,7 @@ function GestDashboard() {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-sm font-medium text-gray-500">Cotisations impayées</p>
-              <p className="mt-1 text-2xl font-bold text-gray-800">{fmt(fin?.total_impaye)}</p>
+              <p className="mt-1 text-2xl font-bold text-gray-800">{fmt(fin?.total_cot_impaye)}</p>
             </div>
             <div className="w-10 h-10 rounded-lg bg-red-50 text-red-500 flex items-center justify-center">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -185,26 +185,28 @@ function GestDashboard() {
                 <span className="font-medium text-gray-800">{fmt(fin.budget_annuel)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Total charges</span>
-                <span className="font-medium text-gray-800">{fmt(fin.total_charges)}</span>
+                <span className="text-gray-500">Dépenses réalisées</span>
+                <span className="font-medium text-gray-800">{fmt(fin.total_depenses_realisees)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Total collecté</span>
-                <span className="font-medium text-green-600">{fmt(fin.total_paye)}</span>
+                <span className="text-gray-500">Cotisations collectées</span>
+                <span className="font-medium text-green-600">{fmt(fin.total_cot_paye)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Total impayé</span>
-                <span className="font-medium text-red-600">{fmt(fin.total_impaye)}</span>
+                <span className="text-gray-500">Cotisations impayées</span>
+                <span className="font-medium text-red-600">{fmt(fin.total_cot_impaye)}</span>
               </div>
               <div className="pt-2 border-t border-gray-100">
                 <div className="flex justify-between text-sm mb-1">
                   <span className="text-gray-500">Taux de recouvrement</span>
-                  <span className="font-bold text-gray-800">{fin.taux_recouvrement}%</span>
+                  <span className="font-bold text-gray-800">
+                    {fin.total_cot_attendu > 0 ? Math.round((fin.total_cot_paye / fin.total_cot_attendu) * 100) : 0}%
+                  </span>
                 </div>
                 <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-green-500 rounded-full transition-all"
-                    style={{ width: `${fin.taux_recouvrement}%` }}
+                    style={{ width: `${fin.total_cot_attendu > 0 ? Math.round((fin.total_cot_paye / fin.total_cot_attendu) * 100) : 0}%` }}
                   />
                 </div>
               </div>
@@ -217,16 +219,16 @@ function GestDashboard() {
               <h2 className="font-semibold text-gray-800">Dernières dépenses</h2>
             </div>
             <div className="divide-y divide-gray-50">
-              {fin.depenses.slice(0, 5).map((d) => (
+              {(fin.depenses_list || []).slice(0, 5).map((d) => (
                 <div key={d.id} className="flex items-center justify-between px-5 py-3">
                   <div>
                     <p className="text-sm font-medium text-gray-700">{d.libelle}</p>
-                    <p className="text-xs text-gray-400">Exercice {d.exercice}</p>
+                    <p className="text-xs text-gray-400">{d.categorie}</p>
                   </div>
-                  <span className="text-sm font-semibold text-gray-700">{fmt(d.montant_total)}</span>
+                  <span className="text-sm font-semibold text-gray-700">{fmt(d.montant)}</span>
                 </div>
               ))}
-              {fin.depenses.length === 0 && (
+              {(fin.depenses_list || []).length === 0 && (
                 <p className="px-5 py-4 text-sm text-gray-400">Aucune dépense</p>
               )}
             </div>
