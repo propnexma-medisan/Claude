@@ -54,38 +54,26 @@ router.get('/:coproprieteId', authenticate, (req, res) => {
     const copropriete = db.prepare('SELECT * FROM coproprietes WHERE id = ?').get(coproprieteId);
     if (!copropriete) return res.status(404).json({ error: 'Résidence non trouvée' });
 
-    // Budget annuel from budget_lignes (what the Budget page writes)
     const currentYear = new Date().getFullYear();
+    const annee = req.query.annee ? parseInt(req.query.annee) : currentYear;
+    const currentMonth = new Date().toISOString().slice(0, 7);
+
+    // Budget annuel from budget_lignes filtered by selected year
     const budgetRow = db.prepare(`
       SELECT COALESCE(SUM(bl.montant_annuel), 0) as budget_annuel
       FROM budget_lignes bl
       JOIN budgets b ON bl.budget_id = b.id
       WHERE b.copropriete_id = ? AND b.annee = ?
-    `).get(coproprieteId, currentYear);
+    `).get(coproprieteId, annee);
 
-    // Total charges
-    const totalChargesRow = db.prepare(`
-      SELECT COALESCE(SUM(montant_total), 0) as total
-      FROM charges WHERE copropriete_id = ?
-    `).get(coproprieteId);
+    // Dépenses réalisées filtered by selected year
+    const depensesList = db.prepare(`
+      SELECT * FROM depenses
+      WHERE copropriete_id = ? AND strftime('%Y', date_depense) = ?
+      ORDER BY date_depense DESC
+    `).all(coproprieteId, String(annee));
 
-    // Total payé
-    const totalPayeRow = db.prepare(`
-      SELECT COALESCE(SUM(cr.montant), 0) as total
-      FROM charge_repartitions cr
-      JOIN charges ch ON cr.charge_id = ch.id
-      WHERE ch.copropriete_id = ? AND cr.statut_paiement = 'Payé'
-    `).get(coproprieteId);
-
-    // Dépenses (charges list)
-    const depenses = db.prepare(`
-      SELECT id, libelle, montant_total, date_echeance, statut, budget_annuel, exercice, created_at
-      FROM charges
-      WHERE copropriete_id = ?
-      ORDER BY date_echeance DESC
-    `).all(coproprieteId);
-
-    // Cotisations par lot
+    // Cotisations par lot (legacy, kept for Finances page)
     const cotisations = db.prepare(`
       SELECT l.id as lot_id, l.numero as lot_numero, l.type as lot_type,
              l.proprietaire_nom, l.tantiemes,
@@ -104,14 +92,16 @@ router.get('/:coproprieteId', authenticate, (req, res) => {
     `).all(coproprieteId, coproprieteId);
 
     // Cotisations with paiements totals
-    const currentMonth = new Date().toISOString().slice(0, 7);
+    // total_attendu / cot_impaye = only past-due months (mois <= currentMonth)
+    // cot_a_collecter = all remaining unpaid (past + future)
     const cotisationsList = db.prepare(`
       SELECT c.*,
         u.nom, u.prenom, u.email,
         l.numero as lot_numero, l.type as lot_type,
         COALESCE(SUM(CASE WHEN cp.mois <= ? THEN cp.montant ELSE 0 END), 0) as total_attendu,
         COALESCE(SUM(CASE WHEN cp.statut = 'Payé' THEN cp.montant ELSE 0 END), 0) as cot_paye,
-        COALESCE(SUM(CASE WHEN cp.statut != 'Payé' AND cp.mois <= ? THEN cp.montant ELSE 0 END), 0) as cot_impaye
+        COALESCE(SUM(CASE WHEN cp.statut != 'Payé' AND cp.mois <= ? THEN cp.montant ELSE 0 END), 0) as cot_impaye,
+        COALESCE(SUM(CASE WHEN cp.statut != 'Payé' THEN cp.montant ELSE 0 END), 0) as cot_a_collecter
       FROM cotisations c
       JOIN users u ON c.user_id = u.id
       LEFT JOIN lots l ON c.lot_id = l.id
@@ -121,36 +111,23 @@ router.get('/:coproprieteId', authenticate, (req, res) => {
       ORDER BY c.statut ASC, c.date_debut DESC
     `).all(currentMonth, currentMonth, coproprieteId);
 
-    // Real depenses from depenses table
-    const depensesList = db.prepare(`
-      SELECT * FROM depenses
-      WHERE copropriete_id = ?
-      ORDER BY date_depense DESC
-    `).all(coproprieteId);
-
     const total_cot_attendu = cotisationsList.reduce((s, c) => s + c.total_attendu, 0);
     const total_cot_paye = cotisationsList.reduce((s, c) => s + c.cot_paye, 0);
     const total_cot_impaye = cotisationsList.reduce((s, c) => s + c.cot_impaye, 0);
+    const total_cot_a_collecter = cotisationsList.reduce((s, c) => s + c.cot_a_collecter, 0);
     const total_depenses_realisees = depensesList.reduce((s, d) => s + d.montant, 0);
-
-    const total_charges = totalChargesRow.total;
-    const total_paye = totalPayeRow.total;
-    const total_impaye = total_charges - total_paye;
 
     res.json({
       copropriete,
+      annee,
       budget_annuel: budgetRow.budget_annuel,
-      total_charges,
-      total_paye,
-      total_impaye,
-      taux_recouvrement: total_charges > 0 ? Math.round((total_paye / total_charges) * 100) : 0,
-      depenses,
       cotisations_par_lot: cotisations,
       cotisations_list: cotisationsList,
       depenses_list: depensesList,
       total_cot_attendu,
       total_cot_paye,
       total_cot_impaye,
+      total_cot_a_collecter,
       total_depenses_realisees,
     });
   } catch (err) {

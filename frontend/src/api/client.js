@@ -124,7 +124,7 @@ export const messages = {
 
 // Finances
 export const finances = {
-  getByResidence: (id) => api.get(`/finances/${id}`),
+  getByResidence: (id, annee) => api.get(`/finances/${id}${annee ? `?annee=${annee}` : ''}`),
   getGlobal: () => api.get('/finances/global'),
 };
 

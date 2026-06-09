@@ -8,22 +8,28 @@ function fmt(n) {
   return formatMAD(n || 0);
 }
 
+const currentYear = new Date().getFullYear();
+const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
+
 function GestDashboard() {
   const { user, selectedCoproId, coproprietes } = useAuth();
   const [stats, setStats] = useState(null);
   const [alertesCotisations, setAlertesCotisations] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [annee, setAnnee] = useState(currentYear);
 
   useEffect(() => {
     if (!selectedCoproId) {
       setLoading(false);
       return;
     }
+    setLoading(true);
+    setError(null);
     Promise.all([
       users.byResidence(selectedCoproId),
       tickets.getAll(selectedCoproId),
-      finances.getByResidence(selectedCoproId),
+      finances.getByResidence(selectedCoproId, annee),
       cotisations.getAlertes(selectedCoproId),
     ])
       .then(([copropietaires, allTickets, fin, alertes]) => {
@@ -33,7 +39,7 @@ function GestDashboard() {
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [selectedCoproId]);
+  }, [selectedCoproId, annee]);
 
   if (loading) {
     return (
@@ -61,14 +67,23 @@ function GestDashboard() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Tableau de bord</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {coproprietes.find((c) => c.id === selectedCoproId)?.nom || user.copropriete_nom}
-        </p>
+      <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Tableau de bord</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {coproprietes.find((c) => c.id === selectedCoproId)?.nom || user.copropriete_nom}
+          </p>
+        </div>
+        <select
+          value={annee}
+          onChange={(e) => setAnnee(parseInt(e.target.value))}
+          className="border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm"
+        >
+          {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
         <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
           <div className="flex items-start justify-between">
             <div>
@@ -98,12 +113,27 @@ function GestDashboard() {
         <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-500">Cotisations impayées</p>
-              <p className="mt-1 text-2xl font-bold text-gray-800">{fmt(fin?.total_cot_impaye)}</p>
+              <p className="text-xs font-medium text-gray-500">Cotisations impayées</p>
+              <p className="mt-1 text-xl font-bold text-red-600">{fmt(fin?.total_cot_impaye)}</p>
+              <p className="text-xs text-gray-400 mt-0.5">Mois échus non payés</p>
             </div>
-            <div className="w-10 h-10 rounded-lg bg-red-50 text-red-500 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-red-50 text-red-500 flex items-center justify-center flex-shrink-0">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-medium text-gray-500">À collecter</p>
+              <p className="mt-1 text-xl font-bold text-purple-600">{fmt(fin?.total_cot_a_collecter)}</p>
+              <p className="text-xs text-gray-400 mt-0.5">Total restant dû</p>
+            </div>
+            <div className="w-10 h-10 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center flex-shrink-0">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
             </div>
           </div>
