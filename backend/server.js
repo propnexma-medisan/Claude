@@ -56,6 +56,7 @@ const messagesRouter = require('./routes/messages');
 const financesRouter = require('./routes/finances');
 const budgetsRouter = require('./routes/budgets');
 const cotisationsRouter = require('./routes/cotisations');
+const fournisseursRouter = require('./routes/fournisseurs');
 const adminRouter = require('./routes/admin');
 
 app.use('/api/coproprietes', authenticate, copropietesRouter);
@@ -69,6 +70,7 @@ app.use('/api/messages', messagesRouter);
 app.use('/api/finances', financesRouter);
 app.use('/api', budgetsRouter);
 app.use('/api', cotisationsRouter);
+app.use('/api/fournisseurs', authenticate, fournisseursRouter);
 app.use('/api/admin', authenticate, requireRole('admin'), adminRouter);
 
 // Dashboard stats (admin/gestionnaire)

@@ -270,4 +270,40 @@ try {
   `);
 } catch {}
 
+// Fournisseurs
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS fournisseurs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    copropriete_id INTEGER NOT NULL REFERENCES coproprietes(id) ON DELETE CASCADE,
+    nom TEXT NOT NULL,
+    categorie TEXT NOT NULL DEFAULT 'Divers',
+    contact_nom TEXT,
+    contact_email TEXT,
+    contact_tel TEXT,
+    adresse TEXT,
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+} catch {}
+
+// Contrats fournisseurs
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS contrats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fournisseur_id INTEGER NOT NULL REFERENCES fournisseurs(id) ON DELETE CASCADE,
+    copropriete_id INTEGER NOT NULL REFERENCES coproprietes(id) ON DELETE CASCADE,
+    titre TEXT NOT NULL,
+    type_contrat TEXT NOT NULL DEFAULT 'Maintenance',
+    montant_annuel REAL,
+    date_debut DATE,
+    date_fin DATE,
+    statut TEXT DEFAULT 'Actif' CHECK(statut IN ('Actif','Expiré','Résilié')),
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+} catch {}
+
+// Link depenses to fournisseurs
+try { db.exec('ALTER TABLE depenses ADD COLUMN fournisseur_id INTEGER REFERENCES fournisseurs(id) ON DELETE SET NULL'); } catch {}
+
 module.exports = db;

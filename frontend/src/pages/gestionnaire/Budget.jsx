@@ -1,7 +1,7 @@
 import { formatMAD } from '../../utils/currency';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { budgets as budgetsApi, depenses as depensesApi, appelsFonds as appelsFondsApi } from '../../api/client';
+import { budgets as budgetsApi, depenses as depensesApi, appelsFonds as appelsFondsApi, fournisseurs as fournisseursApi } from '../../api/client';
 
 const CATEGORIES_BUDGET = [
   'Honoraires syndic',
@@ -548,7 +548,7 @@ function TabDepenses({ coproprieteId }) {
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-700">{d.categorie}</span>
                   </td>
                   <td className="px-4 py-3 text-gray-800 font-medium">{d.libelle}</td>
-                  <td className="px-4 py-3 text-gray-500">{d.fournisseur || '—'}</td>
+                  <td className="px-4 py-3 text-gray-500">{d.fournisseur_nom || d.fournisseur || '—'}</td>
                   <td className="px-4 py-3 text-gray-500 font-mono text-xs">{d.numero_facture || '—'}</td>
                   <td className="px-4 py-3 text-right font-semibold text-gray-800">{formatMAD(d.montant)}</td>
                   <td className="px-4 py-3 text-center">
@@ -612,13 +612,18 @@ function DepenseModal({ depense, coproprieteId, budgetsList, onClose, onSaved })
     libelle: depense?.libelle || '',
     montant: depense?.montant || '',
     date_depense: depense?.date_depense || today,
-    fournisseur: depense?.fournisseur || '',
+    fournisseur_id: depense?.fournisseur_id || '',
     numero_facture: depense?.numero_facture || '',
     notes: depense?.notes || '',
     justificatif_url: depense?.justificatif_url || '',
   });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [fournisseursList, setFournisseursList] = useState([]);
+
+  useEffect(() => {
+    fournisseursApi.getAll(coproprieteId).then(setFournisseursList).catch(() => {});
+  }, [coproprieteId]);
 
   const uploadJustificatif = async (file) => {
     setUploading(true);
@@ -636,7 +641,7 @@ function DepenseModal({ depense, coproprieteId, budgetsList, onClose, onSaved })
     e.preventDefault();
     setSaving(true);
     try {
-      const payload = { ...form, budget_id: form.budget_id || null };
+      const payload = { ...form, budget_id: form.budget_id || null, fournisseur_id: form.fournisseur_id || null };
       if (isEdit) {
         await depensesApi.update(depense.id, payload);
       } else {
@@ -683,7 +688,10 @@ function DepenseModal({ depense, coproprieteId, budgetsList, onClose, onSaved })
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Fournisseur</label>
-              <input type="text" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form.fournisseur} onChange={e => setForm(f => ({ ...f, fournisseur: e.target.value }))} placeholder="Nom du fournisseur" />
+              <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form.fournisseur_id} onChange={e => setForm(f => ({ ...f, fournisseur_id: e.target.value }))}>
+                <option value="">— Aucun —</option>
+                {fournisseursList.map(f => <option key={f.id} value={f.id}>{f.nom} ({f.categorie})</option>)}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">N° Facture</label>

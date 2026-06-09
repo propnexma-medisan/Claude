@@ -178,6 +178,17 @@ export const relances = {
   update: (id, data) => api.put(`/relances/${id}`, data),
 };
 
+export const fournisseurs = {
+  getAll: (coproprieteId) => api.get(`/fournisseurs?copropriete_id=${coproprieteId}`),
+  create: (data) => api.post('/fournisseurs', data),
+  update: (id, data) => api.put(`/fournisseurs/${id}`, data),
+  delete: (id) => api.delete(`/fournisseurs/${id}`),
+  getContrats: (fournisseurId) => api.get(`/fournisseurs/${fournisseurId}/contrats`),
+  createContrat: (fournisseurId, data) => api.post(`/fournisseurs/${fournisseurId}/contrats`, data),
+  updateContrat: (id, data) => api.put(`/fournisseurs/contrats/${id}`, data),
+  deleteContrat: (id) => api.delete(`/fournisseurs/contrats/${id}`),
+};
+
 export const adminApi = {
   getStats: () => api.get('/admin/stats'),
   getDashboard: () => api.get('/admin/dashboard'),
