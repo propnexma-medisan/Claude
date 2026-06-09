@@ -104,13 +104,14 @@ router.get('/:coproprieteId', authenticate, (req, res) => {
     `).all(coproprieteId, coproprieteId);
 
     // Cotisations with paiements totals
+    const currentMonth = new Date().toISOString().slice(0, 7);
     const cotisationsList = db.prepare(`
       SELECT c.*,
         u.nom, u.prenom, u.email,
         l.numero as lot_numero, l.type as lot_type,
-        COALESCE(SUM(cp.montant), 0) as total_attendu,
+        COALESCE(SUM(CASE WHEN cp.mois <= ? THEN cp.montant ELSE 0 END), 0) as total_attendu,
         COALESCE(SUM(CASE WHEN cp.statut = 'Payé' THEN cp.montant ELSE 0 END), 0) as cot_paye,
-        COALESCE(SUM(CASE WHEN cp.statut != 'Payé' THEN cp.montant ELSE 0 END), 0) as cot_impaye
+        COALESCE(SUM(CASE WHEN cp.statut != 'Payé' AND cp.mois <= ? THEN cp.montant ELSE 0 END), 0) as cot_impaye
       FROM cotisations c
       JOIN users u ON c.user_id = u.id
       LEFT JOIN lots l ON c.lot_id = l.id
@@ -118,7 +119,7 @@ router.get('/:coproprieteId', authenticate, (req, res) => {
       WHERE c.copropriete_id = ?
       GROUP BY c.id
       ORDER BY c.statut ASC, c.date_debut DESC
-    `).all(coproprieteId);
+    `).all(currentMonth, currentMonth, coproprieteId);
 
     // Real depenses from depenses table
     const depensesList = db.prepare(`
