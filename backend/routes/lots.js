@@ -6,7 +6,7 @@ const { canGestionnaireAccessResidence } = require('../utils/access');
 // PUT update lot
 router.put('/:id', (req, res) => {
   try {
-    const { numero, type, surface, tantiemes, proprietaire_nom, proprietaire_email, proprietaire_tel } = req.body;
+    const { numero, type, surface, tantiemes, copropietaire_id } = req.body;
     const existing = db.prepare('SELECT * FROM lots WHERE id = ?').get(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Lot non trouvé' });
     if (req.user.role === 'gestionnaire' && !canGestionnaireAccessResidence(req.user.id, existing.copropriete_id)) {
@@ -19,21 +19,32 @@ router.put('/:id', (req, res) => {
     }
 
     db.prepare(`
-      UPDATE lots SET numero = ?, type = ?, surface = ?, tantiemes = ?,
-        proprietaire_nom = ?, proprietaire_email = ?, proprietaire_tel = ?
+      UPDATE lots SET numero = ?, type = ?, surface = ?, tantiemes = ?
       WHERE id = ?
     `).run(
       numero || existing.numero,
       type || existing.type,
       surface !== undefined ? surface : existing.surface,
       tantiemes !== undefined ? tantiemes : existing.tantiemes,
-      proprietaire_nom !== undefined ? proprietaire_nom : existing.proprietaire_nom,
-      proprietaire_email !== undefined ? proprietaire_email : existing.proprietaire_email,
-      proprietaire_tel !== undefined ? proprietaire_tel : existing.proprietaire_tel,
       req.params.id
     );
 
-    const updated = db.prepare('SELECT * FROM lots WHERE id = ?').get(req.params.id);
+    // Update copropietaire link
+    if (copropietaire_id !== undefined) {
+      // Unlink current copropietaire from this lot
+      db.prepare(`UPDATE users SET lot_id = NULL WHERE lot_id = ? AND role = 'copropietaire'`).run(req.params.id);
+      // Link new copropietaire
+      if (copropietaire_id) {
+        db.prepare(`UPDATE users SET lot_id = ? WHERE id = ? AND role = 'copropietaire'`).run(req.params.id, copropietaire_id);
+      }
+    }
+
+    const updated = db.prepare(`
+      SELECT l.*, u.id as copropietaire_id, u.nom as copropietaire_nom,
+        u.prenom as copropietaire_prenom, u.email as copropietaire_email
+      FROM lots l LEFT JOIN users u ON u.lot_id = l.id AND u.role = 'copropietaire'
+      WHERE l.id = ?
+    `).get(req.params.id);
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import Modal from '../../components/Modal';
-import { coproprietes as coproApi, lots as lotsApi } from '../../api/client';
+import { coproprietes as coproApi, lots as lotsApi, users as usersApi } from '../../api/client';
 
 const TYPE_OPTIONS = ['Appartement', 'Studio', 'Commerce', 'Bureau', 'Parking', 'Cave'];
 
@@ -14,11 +14,12 @@ const typeColors = {
   Cave: 'bg-amber-100 text-amber-700',
 };
 
-const emptyForm = { numero: '', type: 'Appartement', surface: '', tantiemes: '', proprietaire_nom: '', proprietaire_email: '', proprietaire_tel: '' };
+const emptyForm = { numero: '', type: 'Appartement', surface: '', tantiemes: '', copropietaire_id: '' };
 
 function Lots() {
   const { selectedCoproId } = useAuth();
   const [list, setList] = useState([]);
+  const [copropietaires, setCopropietaires] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -28,17 +29,33 @@ function Lots() {
 
   const load = () => {
     if (!selectedCoproId) { setLoading(false); return; }
-    coproApi.getLots(selectedCoproId).then(setList).catch(() => {}).finally(() => setLoading(false));
+    Promise.all([
+      coproApi.getLots(selectedCoproId),
+      usersApi.byResidence(selectedCoproId),
+    ]).then(([lots, users]) => {
+      setList(lots);
+      setCopropietaires(users.filter((u) => u.role === 'copropietaire'));
+    }).catch(() => {}).finally(() => setLoading(false));
   };
 
   useEffect(() => { setLoading(true); load(); }, [selectedCoproId]);
 
+  // Copropriétaires available for selection: not linked to any lot, + the one currently linked to this lot
+  const availableForForm = (editId) => {
+    const currentLot = list.find((l) => l.id === editId);
+    return copropietaires.filter(
+      (u) => !u.lot_id || u.lot_id === editId || u.id === currentLot?.copropietaire_id
+    );
+  };
+
   const openNew = () => { setForm(emptyForm); setEditId(null); setShowForm(true); setError(null); };
   const openEdit = (lot) => {
     setForm({
-      numero: lot.numero, type: lot.type, surface: lot.surface || '',
-      tantiemes: lot.tantiemes || '', proprietaire_nom: lot.proprietaire_nom || '',
-      proprietaire_email: lot.proprietaire_email || '', proprietaire_tel: lot.proprietaire_tel || '',
+      numero: lot.numero,
+      type: lot.type,
+      surface: lot.surface || '',
+      tantiemes: lot.tantiemes || '',
+      copropietaire_id: lot.copropietaire_id || '',
     });
     setEditId(lot.id);
     setShowForm(true);
@@ -50,14 +67,21 @@ function Lots() {
     setSaving(true);
     setError(null);
     try {
+      const payload = {
+        numero: form.numero,
+        type: form.type,
+        surface: form.surface,
+        tantiemes: form.tantiemes,
+        copropietaire_id: form.copropietaire_id || null,
+      };
       if (editId) {
-        const updated = await lotsApi.update(editId, form);
-        setList((l) => l.map((x) => (x.id === editId ? updated : x)));
+        await lotsApi.update(editId, payload);
       } else {
-        const created = await coproApi.createLot(selectedCoproId, form);
-        setList((l) => [...l, created]);
+        await coproApi.createLot(selectedCoproId, payload);
       }
       setShowForm(false);
+      setLoading(true);
+      load();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -79,6 +103,8 @@ function Lots() {
     return <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-yellow-700">Aucune résidence assignée.</div>;
   }
 
+  const available = availableForForm(editId);
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
@@ -99,7 +125,7 @@ function Lots() {
           <table className="w-full text-sm min-w-[600px]">
             <thead className="bg-gray-50">
               <tr>
-                {['N°', 'Type', 'Surface', 'Tantièmes', 'Propriétaire', ''].map((h) => (
+                {['N°', 'Type', 'Surface', 'Tantièmes', 'Copropriétaire', ''].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{h}</th>
                 ))}
               </tr>
@@ -117,13 +143,12 @@ function Lots() {
                   <td className="px-4 py-3 text-gray-600">{lot.surface ? `${lot.surface} m²` : '—'}</td>
                   <td className="px-4 py-3 text-gray-600">{lot.tantiemes || '—'}</td>
                   <td className="px-4 py-3">
-                    {lot.proprietaire_nom ? (
+                    {lot.copropietaire_id ? (
                       <div>
-                        <p className="text-gray-700">{lot.proprietaire_nom}</p>
-                        {lot.proprietaire_email && <p className="text-xs text-gray-400">{lot.proprietaire_email}</p>}
-                        {lot.proprietaire_tel && <p className="text-xs text-gray-400">{lot.proprietaire_tel}</p>}
+                        <p className="text-gray-700 font-medium">{lot.copropietaire_prenom} {lot.copropietaire_nom}</p>
+                        <p className="text-xs text-gray-400">{lot.copropietaire_email}</p>
                       </div>
-                    ) : <span className="text-gray-400">—</span>}
+                    ) : <span className="text-xs text-gray-400 italic">Non assigné</span>}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-2">
@@ -160,18 +185,24 @@ function Lots() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Tantièmes</label>
               <input type="number" value={form.tantiemes} onChange={(e) => setForm({ ...form, tantiemes: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="850" />
             </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nom du propriétaire</label>
-              <input value={form.proprietaire_nom} onChange={(e) => setForm({ ...form, proprietaire_nom: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Marie Dupont" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email propriétaire</label>
-              <input type="email" value={form.proprietaire_email} onChange={(e) => setForm({ ...form, proprietaire_email: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="marie@email.com" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Téléphone propriétaire</label>
-              <input value={form.proprietaire_tel} onChange={(e) => setForm({ ...form, proprietaire_tel: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="06 12 34 56 78" />
-            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Copropriétaire</label>
+            <select
+              value={form.copropietaire_id}
+              onChange={(e) => setForm({ ...form, copropietaire_id: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">— Non assigné —</option>
+              {available.map((u) => (
+                <option key={u.id} value={u.id}>{u.prenom} {u.nom} ({u.email})</option>
+              ))}
+            </select>
+            {copropietaires.filter((u) => u.lot_id && u.lot_id !== editId).length > 0 && (
+              <p className="text-xs text-gray-400 mt-1">
+                {copropietaires.filter((u) => u.lot_id && u.lot_id !== editId).length} copropriétaire(s) déjà assigné(s) à d'autres lots
+              </p>
+            )}
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600">Annuler</button>

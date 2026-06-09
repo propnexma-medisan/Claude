@@ -88,7 +88,15 @@ router.delete('/:id', (req, res) => {
 // GET lots for a copropriete
 router.get('/:id/lots', (req, res) => {
   try {
-    const lots = db.prepare('SELECT * FROM lots WHERE copropriete_id = ? ORDER BY numero ASC').all(req.params.id);
+    const lots = db.prepare(`
+      SELECT l.*,
+        u.id as copropietaire_id, u.nom as copropietaire_nom,
+        u.prenom as copropietaire_prenom, u.email as copropietaire_email
+      FROM lots l
+      LEFT JOIN users u ON u.lot_id = l.id AND u.role = 'copropietaire'
+      WHERE l.copropriete_id = ?
+      ORDER BY l.numero ASC
+    `).all(req.params.id);
     res.json(lots);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -101,7 +109,7 @@ router.post('/:id/lots', (req, res) => {
     if (req.user.role === 'gestionnaire' && !canGestionnaireAccessResidence(req.user.id, req.params.id)) {
       return res.status(403).json({ error: 'Accès refusé à cette résidence' });
     }
-    const { numero, type, surface, tantiemes, proprietaire_nom, proprietaire_email, proprietaire_tel } = req.body;
+    const { numero, type, surface, tantiemes, copropietaire_id } = req.body;
     if (!numero || !type) {
       return res.status(400).json({ error: 'Les champs numero et type sont requis' });
     }
@@ -111,9 +119,15 @@ router.post('/:id/lots', (req, res) => {
     }
 
     const result = db.prepare(`
-      INSERT INTO lots (copropriete_id, numero, type, surface, tantiemes, proprietaire_nom, proprietaire_email, proprietaire_tel)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(req.params.id, numero, type, surface || null, tantiemes || 0, proprietaire_nom || null, proprietaire_email || null, proprietaire_tel || null);
+      INSERT INTO lots (copropriete_id, numero, type, surface, tantiemes)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(req.params.id, numero, type, surface || null, tantiemes || 0);
+
+    const lotId = result.lastInsertRowid;
+
+    if (copropietaire_id) {
+      db.prepare(`UPDATE users SET lot_id = ? WHERE id = ? AND role = 'copropietaire'`).run(lotId, copropietaire_id);
+    }
 
     // Update nb_lots
     db.prepare(`
@@ -121,7 +135,12 @@ router.post('/:id/lots', (req, res) => {
       WHERE id = ?
     `).run(req.params.id, req.params.id);
 
-    const newLot = db.prepare('SELECT * FROM lots WHERE id = ?').get(result.lastInsertRowid);
+    const newLot = db.prepare(`
+      SELECT l.*, u.id as copropietaire_id, u.nom as copropietaire_nom,
+        u.prenom as copropietaire_prenom, u.email as copropietaire_email
+      FROM lots l LEFT JOIN users u ON u.lot_id = l.id AND u.role = 'copropietaire'
+      WHERE l.id = ?
+    `).get(lotId);
     res.status(201).json(newLot);
   } catch (err) {
     res.status(500).json({ error: err.message });
