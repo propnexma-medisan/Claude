@@ -267,7 +267,7 @@ function RelanceModal({ cotisation, onClose, onSave }) {
 }
 
 // ─── Modal: New Cotisation ─────────────────────────────────────────────────────
-function NewCotisationModal({ coproprieteId, coproUsers, lots, onClose, onSave }) {
+function NewCotisationModal({ coproprieteId, coproUsers, onClose, onSave }) {
   const [form, setForm] = useState({
     user_id: '',
     lot_id: '',
@@ -279,6 +279,13 @@ function NewCotisationModal({ coproprieteId, coproUsers, lots, onClose, onSave }
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const selectedUser = coproUsers.find((u) => String(u.id) === String(form.user_id));
+
+  function handleUserChange(userId) {
+    const u = coproUsers.find((x) => String(x.id) === String(userId));
+    setForm((f) => ({ ...f, user_id: userId, lot_id: u?.lot_id || '' }));
+  }
+
   async function handleSave() {
     if (!form.user_id || !form.montant_mensuel || !form.date_debut || !form.date_fin) {
       setError('Veuillez remplir tous les champs obligatoires.');
@@ -287,7 +294,7 @@ function NewCotisationModal({ coproprieteId, coproUsers, lots, onClose, onSave }
     setSaving(true);
     setError('');
     try {
-      await onSave({ copropriete_id: coproprieteId, ...form, montant_mensuel: parseFloat(form.montant_mensuel) });
+      await onSave({ copropriete_id: coproprieteId, ...form, lot_id: form.lot_id || null, montant_mensuel: parseFloat(form.montant_mensuel) });
       onClose();
     } catch (e) {
       setError(e.message);
@@ -295,12 +302,6 @@ function NewCotisationModal({ coproprieteId, coproUsers, lots, onClose, onSave }
       setSaving(false);
     }
   }
-
-  const userLots = lots.filter((l) => {
-    const selectedUser = coproUsers.find((u) => String(u.id) === String(form.user_id));
-    if (!selectedUser) return true;
-    return String(l.id) === String(selectedUser.lot_id) || true;
-  });
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -315,23 +316,24 @@ function NewCotisationModal({ coproprieteId, coproUsers, lots, onClose, onSave }
           {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">{error}</p>}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Copropriétaire <span className="text-red-500">*</span></label>
-            <select value={form.user_id} onChange={(e) => setForm({ ...form, user_id: e.target.value, lot_id: '' })}
+            <select value={form.user_id} onChange={(e) => handleUserChange(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="">— Sélectionner —</option>
               {coproUsers.map((u) => (
                 <option key={u.id} value={u.id}>{u.prenom} {u.nom}</option>
               ))}
             </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Lot</label>
-            <select value={form.lot_id} onChange={(e) => setForm({ ...form, lot_id: e.target.value })}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="">— Aucun lot spécifique —</option>
-              {userLots.map((l) => (
-                <option key={l.id} value={l.id}>{l.numero} — {l.type}</option>
-              ))}
-            </select>
+            {selectedUser && (
+              <div className="mt-2 flex items-center gap-2 text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+                <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+                {selectedUser.lot_numero
+                  ? <span>Lot <strong className="text-gray-700">{selectedUser.lot_numero}</strong> — {selectedUser.lot_type}{selectedUser.lot_surface ? ` · ${selectedUser.lot_surface} m²` : ''}</span>
+                  : <span className="italic text-gray-400">Aucun lot associé à ce copropriétaire</span>
+                }
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Montant mensuel (Dhs) <span className="text-red-500">*</span></label>
