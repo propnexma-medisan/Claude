@@ -169,6 +169,17 @@ export const cotisations = {
   delete: (id) => api.delete(`/cotisations/${id}`),
   updatePaiement: (id, data) => api.put(`/cotisations/paiements/${id}`, data),
   getAlertes: (coproprieteId) => api.get(`/cotisations/alertes?copropriete_id=${coproprieteId}`),
+  uploadPreuve: (paiementId, file) => {
+    const form = new FormData();
+    form.append('file', file);
+    const token = getToken();
+    return fetch(`${BASE_URL}/cotisations/paiements/${paiementId}/preuves`, {
+      method: 'POST',
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: form,
+    }).then((r) => r.ok ? r.json() : r.json().then((e) => Promise.reject(new Error(e.error || 'Erreur upload'))));
+  },
+  deletePreuve: (preuveId) => api.delete(`/cotisations/preuves/${preuveId}`),
 };
 
 export const relances = {

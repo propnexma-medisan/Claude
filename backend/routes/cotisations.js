@@ -1,8 +1,26 @@
 const express = require('express');
 const router = express.Router();
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const db = require('../database');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { sendRelance } = require('../services/email');
+
+const uploadDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => cb(null, `preuve-${Date.now()}-${file.originalname.replace(/\s+/g, '_')}`),
+});
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ok = file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf';
+    cb(null, ok);
+  },
+});
 
 const APP_URL = process.env.APP_URL || 'https://syndicpro.propnex.ma';
 
@@ -160,13 +178,21 @@ router.get('/cotisations/:id', authenticate, (req, res) => {
       ORDER BY mois ASC
     `).all(req.params.id);
 
+    // Attach preuves to each paiement
+    const paiementsWithPreuves = paiements.map((p) => {
+      const preuves = db.prepare(
+        'SELECT id, filename, original_name, mimetype, created_at FROM paiement_preuves WHERE paiement_id = ? ORDER BY created_at ASC'
+      ).all(p.id).map((pr) => ({ ...pr, url: `/uploads/${pr.filename}` }));
+      return { ...p, preuves };
+    });
+
     const relancesData = db.prepare(`
       SELECT * FROM relances
       WHERE cotisation_id = ?
       ORDER BY sent_at DESC
     `).all(req.params.id);
 
-    res.json({ ...cotisation, paiements, relances: relancesData });
+    res.json({ ...cotisation, paiements: paiementsWithPreuves, relances: relancesData });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -393,6 +419,44 @@ router.post('/relances', authenticate, (req, res) => {
     }
 
     res.status(201).json(relance);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── PREUVES DE PAIEMENT ─────────────────────────────────────────────────────
+
+// POST /api/cotisations/paiements/:id/preuves
+router.post('/cotisations/paiements/:id/preuves', authenticate, upload.single('file'), (req, res) => {
+  try {
+    if (req.user.role === 'copropietaire') return res.status(403).json({ error: 'Accès refusé' });
+    const paiement = db.prepare('SELECT id FROM cotisation_paiements WHERE id = ?').get(req.params.id);
+    if (!paiement) return res.status(404).json({ error: 'Paiement introuvable' });
+    if (!req.file) return res.status(400).json({ error: 'Fichier manquant ou type non autorisé (images/PDF)' });
+
+    const result = db.prepare(
+      'INSERT INTO paiement_preuves (paiement_id, filename, original_name, mimetype) VALUES (?, ?, ?, ?)'
+    ).run(req.params.id, req.file.filename, req.file.originalname, req.file.mimetype);
+
+    const preuve = db.prepare('SELECT * FROM paiement_preuves WHERE id = ?').get(result.lastInsertRowid);
+    res.status(201).json({ ...preuve, url: `/uploads/${preuve.filename}` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/cotisations/preuves/:id
+router.delete('/cotisations/preuves/:id', authenticate, (req, res) => {
+  try {
+    if (req.user.role === 'copropietaire') return res.status(403).json({ error: 'Accès refusé' });
+    const preuve = db.prepare('SELECT * FROM paiement_preuves WHERE id = ?').get(req.params.id);
+    if (!preuve) return res.status(404).json({ error: 'Preuve introuvable' });
+
+    const filePath = path.join(uploadDir, preuve.filename);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
+    db.prepare('DELETE FROM paiement_preuves WHERE id = ?').run(req.params.id);
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

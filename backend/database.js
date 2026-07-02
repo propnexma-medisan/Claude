@@ -306,4 +306,16 @@ try {
 // Link depenses to fournisseurs
 try { db.exec('ALTER TABLE depenses ADD COLUMN fournisseur_id INTEGER REFERENCES fournisseurs(id) ON DELETE SET NULL'); } catch {}
 
+// Preuves de paiement (photos de chèques, virements, etc.)
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS paiement_preuves (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    paiement_id INTEGER NOT NULL REFERENCES cotisation_paiements(id) ON DELETE CASCADE,
+    filename TEXT NOT NULL,
+    original_name TEXT NOT NULL,
+    mimetype TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+} catch {}
+
 module.exports = db;
