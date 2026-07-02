@@ -187,7 +187,9 @@ function Lots() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Copropriétaire</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Copropriétaire <span className="text-gray-400 font-normal">(optionnel — peut être assigné plus tard)</span>
+            </label>
             <select
               value={form.copropietaire_id}
               onChange={(e) => setForm({ ...form, copropietaire_id: e.target.value })}
@@ -198,7 +200,10 @@ function Lots() {
                 <option key={u.id} value={u.id}>{u.prenom} {u.nom} ({u.email})</option>
               ))}
             </select>
-            {copropietaires.filter((u) => u.lot_id && u.lot_id !== editId).length > 0 && (
+            {copropietaires.length === 0 && (
+              <p className="text-xs text-gray-400 mt-1">Aucun copropriétaire créé — ajoutez-en dans la section Copropriétaires</p>
+            )}
+            {copropietaires.length > 0 && copropietaires.filter((u) => u.lot_id && u.lot_id !== editId).length > 0 && (
               <p className="text-xs text-gray-400 mt-1">
                 {copropietaires.filter((u) => u.lot_id && u.lot_id !== editId).length} copropriétaire(s) déjà assigné(s) à d'autres lots
               </p>

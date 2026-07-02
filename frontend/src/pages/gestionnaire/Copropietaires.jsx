@@ -35,6 +35,10 @@ function Copropietaires() {
 
   useEffect(() => { load(); }, [selectedCoproId]);
 
+  // Available lots for a given copropriétaire: unassigned + the one currently assigned to them
+  const availableLots = (currentLotId) =>
+    lots.filter((l) => !l.copropietaire_id || l.id === currentLotId);
+
   const openNew = () => { setForm(emptyForm); setEditId(null); setShowForm(true); setError(null); };
   const openEdit = (u) => {
     setForm({ nom: u.nom, prenom: u.prenom, email: u.email, password: '', telephone: u.telephone || '', lot_id: u.lot_id || '' });
@@ -52,6 +56,7 @@ function Copropietaires() {
         ...form,
         role: 'copropietaire',
         copropriete_id: selectedCoproId,
+        lot_id: form.lot_id || null,
       };
       if (editId && !payload.password) delete payload.password;
 
@@ -63,6 +68,7 @@ function Copropietaires() {
         setList((l) => [...l, created]);
       }
       setShowForm(false);
+      load();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -85,7 +91,7 @@ function Copropietaires() {
     return lot ? `${lot.numero} (${lot.type})` : '—';
   };
 
-  if (!user?.copropriete_id) {
+  if (!selectedCoproId) {
     return <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-yellow-700">Aucune résidence assignée.</div>;
   }
 
@@ -181,11 +187,18 @@ function Copropietaires() {
             <input value={form.telephone} onChange={(e) => setForm({ ...form, telephone: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="06 00 00 00 00" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Lot</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Lot <span className="text-gray-400 font-normal">(optionnel — peut être assigné plus tard)</span>
+            </label>
             <select value={form.lot_id} onChange={(e) => setForm({ ...form, lot_id: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="">— Non assigné —</option>
-              {lots.map((l) => <option key={l.id} value={l.id}>{l.numero} — {l.type}{l.surface ? ` (${l.surface} m²)` : ''}</option>)}
+              {availableLots(editId ? (list.find((u) => u.id === editId)?.lot_id) : null).map((l) => (
+                <option key={l.id} value={l.id}>{l.numero} — {l.type}{l.surface ? ` (${l.surface} m²)` : ''}</option>
+              ))}
             </select>
+            {availableLots(null).length === 0 && lots.length === 0 && (
+              <p className="text-xs text-gray-400 mt-1">Aucun lot créé — créez d'abord des lots dans la section Lots</p>
+            )}
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600">Annuler</button>
