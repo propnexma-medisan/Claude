@@ -267,6 +267,21 @@ function RelanceModal({ cotisation, onClose, onSave }) {
 }
 
 // ─── Modal: New Cotisation ─────────────────────────────────────────────────────
+function getMonthsBetween(start, end) {
+  if (!start || !end) return [];
+  const months = [];
+  let [y, m] = start.split('-').map(Number);
+  const [ey, em] = end.split('-').map(Number);
+  let guard = 0;
+  while ((y < ey || (y === ey && m <= em)) && guard < 120) {
+    months.push(`${y}-${String(m).padStart(2, '0')}`);
+    m++;
+    if (m > 12) { m = 1; y++; }
+    guard++;
+  }
+  return months;
+}
+
 function NewCotisationModal({ coproprieteId, coproUsers, onClose, onSave }) {
   const [form, setForm] = useState({
     user_id: '',
@@ -276,14 +291,35 @@ function NewCotisationModal({ coproprieteId, coproUsers, onClose, onSave }) {
     date_fin: '',
     notes: '',
   });
+  const [paidMonths, setPaidMonths] = useState(new Set());
+  const [batchMode, setBatchMode] = useState('');
+  const [batchDate, setBatchDate] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const selectedUser = coproUsers.find((u) => String(u.id) === String(form.user_id));
+  const allMonths = getMonthsBetween(form.date_debut, form.date_fin);
 
   function handleUserChange(userId) {
     const u = coproUsers.find((x) => String(x.id) === String(userId));
     setForm((f) => ({ ...f, user_id: userId, lot_id: u?.lot_id || '' }));
+  }
+
+  function handleDateChange(field, value) {
+    setForm((f) => ({ ...f, [field]: value }));
+    setPaidMonths(new Set());
+  }
+
+  function toggleMonth(mois) {
+    setPaidMonths((prev) => {
+      const next = new Set(prev);
+      if (next.has(mois)) next.delete(mois); else next.add(mois);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setPaidMonths(paidMonths.size === allMonths.length ? new Set() : new Set(allMonths));
   }
 
   async function handleSave() {
@@ -294,7 +330,25 @@ function NewCotisationModal({ coproprieteId, coproUsers, onClose, onSave }) {
     setSaving(true);
     setError('');
     try {
-      await onSave({ copropriete_id: coproprieteId, ...form, lot_id: form.lot_id || null, montant_mensuel: parseFloat(form.montant_mensuel) });
+      const created = await onSave({
+        copropriete_id: coproprieteId,
+        ...form,
+        lot_id: form.lot_id || null,
+        montant_mensuel: parseFloat(form.montant_mensuel),
+      });
+
+      if (paidMonths.size > 0 && created?.id) {
+        const detail = await cotisations.getById(created.id);
+        const toUpdate = (detail.paiements || []).filter((p) => paidMonths.has(p.mois));
+        await Promise.all(toUpdate.map((p) =>
+          cotisations.updatePaiement(p.id, {
+            statut: 'Payé',
+            mode_paiement: batchMode || '',
+            date_paiement: batchDate || new Date().toISOString().split('T')[0],
+          })
+        ));
+      }
+
       onClose();
     } catch (e) {
       setError(e.message);
@@ -303,17 +357,23 @@ function NewCotisationModal({ coproprieteId, coproUsers, onClose, onSave }) {
     }
   }
 
+  const totalPaye = paidMonths.size > 0 && form.montant_mensuel
+    ? paidMonths.size * parseFloat(form.montant_mensuel)
+    : 0;
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl max-h-[90vh] flex flex-col">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
           <h3 className="font-semibold text-gray-800">Nouvelle cotisation</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 overflow-y-auto">
           {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">{error}</p>}
+
+          {/* Copropriétaire */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Copropriétaire <span className="text-red-500">*</span></label>
             <select value={form.user_id} onChange={(e) => handleUserChange(e.target.value)}
@@ -335,6 +395,8 @@ function NewCotisationModal({ coproprieteId, coproUsers, onClose, onSave }) {
               </div>
             )}
           </div>
+
+          {/* Montant */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Montant mensuel (Dhs) <span className="text-red-500">*</span></label>
             <input type="number" min="0" step="0.01" value={form.montant_mensuel}
@@ -342,25 +404,88 @@ function NewCotisationModal({ coproprieteId, coproUsers, onClose, onSave }) {
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="350.00" />
           </div>
+
+          {/* Dates */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Début <span className="text-red-500">*</span></label>
-              <input type="month" value={form.date_debut} onChange={(e) => setForm({ ...form, date_debut: e.target.value })}
+              <input type="month" value={form.date_debut} onChange={(e) => handleDateChange('date_debut', e.target.value)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Fin <span className="text-red-500">*</span></label>
-              <input type="month" value={form.date_fin} onChange={(e) => setForm({ ...form, date_fin: e.target.value })}
+              <input type="month" value={form.date_fin} onChange={(e) => handleDateChange('date_fin', e.target.value)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
           </div>
+
+          {/* Mois déjà payés */}
+          {allMonths.length > 0 && (
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Mois déjà réglés <span className="text-gray-400 font-normal">(optionnel)</span></p>
+                  <p className="text-xs text-gray-400 mt-0.5">Cliquez pour marquer les mois payés d'avance</p>
+                </div>
+                <button type="button" onClick={toggleAll}
+                  className="text-xs px-2.5 py-1 border border-blue-300 text-blue-600 rounded-full hover:bg-blue-100 transition-colors whitespace-nowrap">
+                  {paidMonths.size === allMonths.length ? 'Tout effacer' : 'Tout cocher'}
+                </button>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                {allMonths.map((mois) => {
+                  const isPaid = paidMonths.has(mois);
+                  return (
+                    <button key={mois} type="button" onClick={() => toggleMonth(mois)}
+                      className={`w-[52px] h-[46px] rounded-lg border text-center text-xs font-medium flex flex-col items-center justify-center gap-0.5 transition-all ${
+                        isPaid
+                          ? 'bg-green-100 text-green-700 border-green-300 shadow-sm'
+                          : 'bg-white text-gray-400 border-gray-200 hover:border-blue-300 hover:text-blue-500'
+                      }`}>
+                      <span className="text-base leading-none">{isPaid ? '✓' : '○'}</span>
+                      <span className="text-[10px] leading-none">{shortMonth(mois)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {paidMonths.size > 0 && (
+                <>
+                  <p className="text-xs text-green-700 font-medium">
+                    {paidMonths.size} mois sélectionné{paidMonths.size > 1 ? 's' : ''}
+                    {form.montant_mensuel ? ` — ${fmt(totalPaye)} au total` : ''}
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Mode de règlement</label>
+                      <select value={batchMode} onChange={(e) => setBatchMode(e.target.value)}
+                        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                        <option value="">— Optionnel —</option>
+                        {['Virement', 'Chèque', 'Espèces', 'Prélèvement', 'Carte bancaire'].map((m) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Date de règlement</label>
+                      <input type="date" value={batchDate} onChange={(e) => setBatchDate(e.target.value)}
+                        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Notes */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
             <textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
           </div>
         </div>
-        <div className="px-6 py-4 border-t border-gray-100 flex gap-3 justify-end">
+        <div className="px-6 py-4 border-t border-gray-100 flex gap-3 justify-end flex-shrink-0">
           <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-200 rounded-lg hover:bg-gray-50">
             Annuler
           </button>
@@ -694,8 +819,9 @@ function Cotisations() {
   useEffect(() => { loadAll(); }, [loadAll]);
 
   async function handleCreate(data) {
-    await cotisations.create(data);
+    const created = await cotisations.create(data);
     loadAll();
+    return created;
   }
 
   async function handleDelete(id) {
@@ -863,7 +989,6 @@ function Cotisations() {
         <NewCotisationModal
           coproprieteId={coproprieteId}
           coproUsers={coproUsers}
-          lots={lotsData}
           onClose={() => setShowNewModal(false)}
           onSave={handleCreate}
         />
