@@ -470,6 +470,22 @@ function TabDepenses({ coproprieteId }) {
     }
   };
 
+  const duplicateDepense = (d) => {
+    const today = new Date().toISOString().split('T')[0];
+    setEditingDepense({
+      budget_id: d.budget_id,
+      categorie: d.categorie,
+      libelle: d.libelle,
+      montant: d.montant,
+      date_depense: today,
+      fournisseur_id: d.fournisseur_id,
+      numero_facture: '',
+      notes: d.notes || '',
+      justificatif_url: '',
+    });
+    setShowModal(true);
+  };
+
   const totalDepense = depensesList.reduce((s, d) => s + (d.montant || 0), 0);
   const nbFactures = depensesList.length;
   const moisActifs = new Set(depensesList.map(d => d.date_depense?.substring(0, 7))).size || 1;
@@ -565,12 +581,20 @@ function TabDepenses({ coproprieteId }) {
                     ) : <span className="text-gray-300 text-xs">—</span>}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => { setEditingDepense(d); setShowModal(true); }} className="text-blue-500 hover:text-blue-700 mr-3">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                    </button>
-                    <button onClick={() => deleteDepense(d.id)} className="text-red-400 hover:text-red-600">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button onClick={() => duplicateDepense(d)} title="Reconduire (dépense récurrente)"
+                        className="text-gray-400 hover:text-green-600 transition-colors">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </button>
+                      <button onClick={() => { setEditingDepense(d); setShowModal(true); }} className="text-blue-500 hover:text-blue-700 transition-colors">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                      </button>
+                      <button onClick={() => deleteDepense(d.id)} className="text-red-400 hover:text-red-600 transition-colors">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
