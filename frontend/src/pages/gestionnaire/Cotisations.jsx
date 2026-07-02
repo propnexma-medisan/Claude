@@ -106,20 +106,12 @@ function PaiementCell({ p, onUpdate, disabled }) {
   );
 }
 
-// ─── Modal: Update Payment ─────────────────────────────────────────────────────
-function PaiementModal({ paiement, onClose, onSave }) {
-  const [form, setForm] = useState({
-    statut: paiement.statut,
-    date_paiement: paiement.date_paiement || '',
-    mode_paiement: paiement.mode_paiement || '',
-    reference: paiement.reference || '',
-    notes: paiement.notes || '',
-  });
-  const [preuves, setPreuves] = useState(paiement.preuves || []);
+// ─── Preuves section (reusable) ───────────────────────────────────────────────
+function PreuvesSection({ cotisationId, initialPreuves }) {
+  const [preuves, setPreuves] = useState(initialPreuves || []);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [lightbox, setLightbox] = useState(null);
-  const [saving, setSaving] = useState(false);
   const fileInputRef = React.useRef(null);
 
   const API_BASE = import.meta.env.PROD ? '' : 'http://localhost:3001';
@@ -130,7 +122,7 @@ function PaiementModal({ paiement, onClose, onSave }) {
     setUploading(true);
     setUploadError('');
     try {
-      const created = await cotisations.uploadPreuve(paiement.id, file);
+      const created = await cotisations.uploadPreuve(cotisationId, file);
       setPreuves((prev) => [...prev, created]);
     } catch (err) {
       setUploadError(err.message);
@@ -140,8 +132,8 @@ function PaiementModal({ paiement, onClose, onSave }) {
     }
   }
 
-  async function handleDeletePreuve(preuveId) {
-    if (!confirm('Supprimer cette preuve ?')) return;
+  async function handleDelete(preuveId) {
+    if (!confirm('Supprimer ce justificatif ?')) return;
     try {
       await cotisations.deletePreuve(preuveId);
       setPreuves((prev) => prev.filter((p) => p.id !== preuveId));
@@ -149,6 +141,93 @@ function PaiementModal({ paiement, onClose, onSave }) {
       alert(err.message);
     }
   }
+
+  return (
+    <>
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-gray-800">Justificatifs</h3>
+          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading}
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50">
+            {uploading
+              ? <span className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+              : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+            }
+            {uploading ? 'Envoi...' : 'Ajouter'}
+          </button>
+          <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleUpload} />
+        </div>
+
+        {uploadError && <p className="text-xs text-red-500 mb-2">{uploadError}</p>}
+
+        {preuves.length === 0 ? (
+          <button type="button" onClick={() => fileInputRef.current?.click()}
+            className="w-full border-2 border-dashed border-gray-200 rounded-xl py-5 text-center text-xs text-gray-400 hover:border-blue-300 hover:text-blue-400 transition-colors">
+            <svg className="w-7 h-7 mx-auto mb-1.5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Joindre un justificatif (photo de chèque, virement…)
+          </button>
+        ) : (
+          <div className="grid grid-cols-4 gap-2">
+            {preuves.map((pr) => (
+              <div key={pr.id} className="relative group">
+                {pr.mimetype?.startsWith('image/') ? (
+                  <button type="button" onClick={() => setLightbox(pr)}
+                    className="w-full aspect-square rounded-lg overflow-hidden border border-gray-200 hover:border-blue-300 transition-colors">
+                    <img src={`${API_BASE}${pr.url}`} alt={pr.original_name} className="w-full h-full object-cover" />
+                  </button>
+                ) : (
+                  <a href={`${API_BASE}${pr.url}`} target="_blank" rel="noreferrer"
+                    className="flex flex-col items-center justify-center w-full aspect-square rounded-lg border border-gray-200 hover:border-blue-300 bg-gray-50 transition-colors">
+                    <svg className="w-7 h-7 text-red-400" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 20V4h5v7h7v9H6z" />
+                    </svg>
+                    <span className="text-[9px] text-gray-500 mt-1 px-1 text-center truncate w-full">{pr.original_name}</span>
+                  </a>
+                )}
+                <button type="button" onClick={() => handleDelete(pr.id)}
+                  className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+            <button type="button" onClick={() => fileInputRef.current?.click()}
+              className="aspect-square rounded-lg border-2 border-dashed border-gray-200 hover:border-blue-300 hover:text-blue-400 text-gray-300 transition-colors flex items-center justify-center">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {lightbox && (
+        <div className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4" onClick={() => setLightbox(null)}>
+          <button className="absolute top-4 right-4 text-white/70 hover:text-white" onClick={() => setLightbox(null)}>
+            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+          <img src={`${API_BASE}${lightbox.url}`} alt={lightbox.original_name}
+            className="max-w-full max-h-full rounded-lg shadow-2xl object-contain" onClick={(e) => e.stopPropagation()} />
+          <p className="absolute bottom-4 text-white/60 text-sm">{lightbox.original_name}</p>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ─── Modal: Update Payment ─────────────────────────────────────────────────────
+function PaiementModal({ paiement, onClose, onSave }) {
+  const [form, setForm] = useState({
+    statut: paiement.statut,
+    date_paiement: paiement.date_paiement || '',
+    mode_paiement: paiement.mode_paiement || '',
+    reference: paiement.reference || '',
+    notes: paiement.notes || '',
+  });
+  const [saving, setSaving] = useState(false);
 
   async function handleSave() {
     setSaving(true);
@@ -161,146 +240,65 @@ function PaiementModal({ paiement, onClose, onSave }) {
   }
 
   return (
-    <>
-      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl w-full max-w-md shadow-xl max-h-[90vh] flex flex-col">
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-            <div>
-              <h3 className="font-semibold text-gray-800">Mettre à jour le paiement</h3>
-              <p className="text-xs text-gray-400 mt-0.5">{fmtMonth(paiement.mois)} · {fmt(paiement.montant)}</p>
-            </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-gray-800">Mettre à jour le paiement</h3>
+            <p className="text-xs text-gray-400 mt-0.5">{fmtMonth(paiement.mois)} · {fmt(paiement.montant)}</p>
           </div>
-          <div className="p-6 space-y-4 overflow-y-auto">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Statut</label>
-              <select value={form.statut} onChange={(e) => setForm({ ...form, statut: e.target.value })}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                {['En attente', 'Payé', 'En retard', 'Partiel'].map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Date de paiement</label>
-              <input type="date" value={form.date_paiement} onChange={(e) => setForm({ ...form, date_paiement: e.target.value })}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Mode de paiement</label>
-              <select value={form.mode_paiement} onChange={(e) => setForm({ ...form, mode_paiement: e.target.value })}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="">— Sélectionner —</option>
-                {['Virement', 'Chèque', 'Espèces', 'Prélèvement', 'Carte bancaire'].map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Référence</label>
-              <input type="text" value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="N° de virement, chèque..." />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-              <textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
-            </div>
-
-            {/* Preuves de paiement */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-gray-700">Preuves de paiement</label>
-                <button type="button" onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                  className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50">
-                  {uploading ? (
-                    <span className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                    </svg>
-                  )}
-                  {uploading ? 'Envoi...' : 'Ajouter'}
-                </button>
-                <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleUpload} />
-              </div>
-
-              {uploadError && <p className="text-xs text-red-500 mb-2">{uploadError}</p>}
-
-              {preuves.length === 0 ? (
-                <button type="button" onClick={() => fileInputRef.current?.click()}
-                  className="w-full border-2 border-dashed border-gray-200 rounded-xl py-4 text-center text-xs text-gray-400 hover:border-blue-300 hover:text-blue-400 transition-colors">
-                  <svg className="w-6 h-6 mx-auto mb-1 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  Cliquez pour joindre une photo de chèque ou un justificatif
-                </button>
-              ) : (
-                <div className="grid grid-cols-3 gap-2">
-                  {preuves.map((pr) => (
-                    <div key={pr.id} className="relative group">
-                      {pr.mimetype?.startsWith('image/') ? (
-                        <button type="button" onClick={() => setLightbox(pr)}
-                          className="w-full aspect-square rounded-lg overflow-hidden border border-gray-200 hover:border-blue-300 transition-colors">
-                          <img src={`${API_BASE}${pr.url}`} alt={pr.original_name}
-                            className="w-full h-full object-cover" />
-                        </button>
-                      ) : (
-                        <a href={`${API_BASE}${pr.url}`} target="_blank" rel="noreferrer"
-                          className="flex flex-col items-center justify-center w-full aspect-square rounded-lg border border-gray-200 hover:border-blue-300 bg-gray-50 transition-colors">
-                          <svg className="w-8 h-8 text-red-400" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 20V4h5v7h7v9H6z" />
-                          </svg>
-                          <span className="text-[10px] text-gray-500 mt-1 px-1 text-center truncate w-full">{pr.original_name}</span>
-                        </a>
-                      )}
-                      <button type="button" onClick={() => handleDeletePreuve(pr.id)}
-                        className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
-                  <button type="button" onClick={() => fileInputRef.current?.click()}
-                    className="aspect-square rounded-lg border-2 border-dashed border-gray-200 hover:border-blue-300 hover:text-blue-400 text-gray-300 transition-colors flex items-center justify-center">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                  </button>
-                </div>
-              )}
-            </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Statut</label>
+            <select value={form.statut} onChange={(e) => setForm({ ...form, statut: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              {['En attente', 'Payé', 'En retard', 'Partiel'].map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
           </div>
-          <div className="px-6 py-4 border-t border-gray-100 flex gap-3 justify-end flex-shrink-0">
-            <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-200 rounded-lg hover:bg-gray-50">
-              Annuler
-            </button>
-            <button onClick={handleSave} disabled={saving}
-              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
-              {saving ? 'Enregistrement...' : 'Enregistrer'}
-            </button>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Date de paiement</label>
+            <input type="date" value={form.date_paiement} onChange={(e) => setForm({ ...form, date_paiement: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Mode de paiement</label>
+            <select value={form.mode_paiement} onChange={(e) => setForm({ ...form, mode_paiement: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="">— Sélectionner —</option>
+              {['Virement', 'Chèque', 'Espèces', 'Prélèvement', 'Carte bancaire'].map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Référence</label>
+            <input type="text" value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="N° de virement, chèque..." />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-gray-100 flex gap-3 justify-end">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-200 rounded-lg hover:bg-gray-50">
+            Annuler
+          </button>
+          <button onClick={handleSave} disabled={saving}
+            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+            {saving ? 'Enregistrement...' : 'Enregistrer'}
+          </button>
         </div>
       </div>
-
-      {/* Lightbox */}
-      {lightbox && (
-        <div className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4" onClick={() => setLightbox(null)}>
-          <button className="absolute top-4 right-4 text-white/70 hover:text-white" onClick={() => setLightbox(null)}>
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
-          <img src={`${API_BASE}${lightbox.url}`} alt={lightbox.original_name}
-            className="max-w-full max-h-full rounded-lg shadow-2xl object-contain"
-            onClick={(e) => e.stopPropagation()} />
-          <p className="absolute bottom-4 text-white/60 text-sm">{lightbox.original_name}</p>
-        </div>
-      )}
-    </>
+    </div>
   );
 }
 
@@ -841,6 +839,11 @@ function CotisationDetail({ cotisationId, coproprieteId, onRefresh, onDelete }) 
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Justificatifs */}
+      <div className="px-6 py-5 border-b border-gray-100">
+        <PreuvesSection cotisationId={cotisationId} initialPreuves={detail.preuves || []} />
       </div>
 
       {/* Historique relances */}

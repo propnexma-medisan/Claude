@@ -306,11 +306,11 @@ try {
 // Link depenses to fournisseurs
 try { db.exec('ALTER TABLE depenses ADD COLUMN fournisseur_id INTEGER REFERENCES fournisseurs(id) ON DELETE SET NULL'); } catch {}
 
-// Preuves de paiement (photos de chèques, virements, etc.)
+// Preuves de paiement liées à la cotisation (pas au paiement mensuel)
 try {
-  db.exec(`CREATE TABLE IF NOT EXISTS paiement_preuves (
+  db.exec(`CREATE TABLE IF NOT EXISTS cotisation_preuves (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    paiement_id INTEGER NOT NULL REFERENCES cotisation_paiements(id) ON DELETE CASCADE,
+    cotisation_id INTEGER NOT NULL REFERENCES cotisations(id) ON DELETE CASCADE,
     filename TEXT NOT NULL,
     original_name TEXT NOT NULL,
     mimetype TEXT,

@@ -178,13 +178,9 @@ router.get('/cotisations/:id', authenticate, (req, res) => {
       ORDER BY mois ASC
     `).all(req.params.id);
 
-    // Attach preuves to each paiement
-    const paiementsWithPreuves = paiements.map((p) => {
-      const preuves = db.prepare(
-        'SELECT id, filename, original_name, mimetype, created_at FROM paiement_preuves WHERE paiement_id = ? ORDER BY created_at ASC'
-      ).all(p.id).map((pr) => ({ ...pr, url: `/uploads/${pr.filename}` }));
-      return { ...p, preuves };
-    });
+    const preuves = db.prepare(
+      'SELECT id, filename, original_name, mimetype, created_at FROM cotisation_preuves WHERE cotisation_id = ? ORDER BY created_at ASC'
+    ).all(req.params.id).map((pr) => ({ ...pr, url: `/uploads/${pr.filename}` }));
 
     const relancesData = db.prepare(`
       SELECT * FROM relances
@@ -192,7 +188,7 @@ router.get('/cotisations/:id', authenticate, (req, res) => {
       ORDER BY sent_at DESC
     `).all(req.params.id);
 
-    res.json({ ...cotisation, paiements: paiementsWithPreuves, relances: relancesData });
+    res.json({ ...cotisation, paiements, preuves, relances: relancesData });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -424,21 +420,21 @@ router.post('/relances', authenticate, (req, res) => {
   }
 });
 
-// ─── PREUVES DE PAIEMENT ─────────────────────────────────────────────────────
+// ─── PREUVES DE COTISATION ───────────────────────────────────────────────────
 
-// POST /api/cotisations/paiements/:id/preuves
-router.post('/cotisations/paiements/:id/preuves', authenticate, upload.single('file'), (req, res) => {
+// POST /api/cotisations/:id/preuves
+router.post('/cotisations/:id/preuves', authenticate, upload.single('file'), (req, res) => {
   try {
     if (req.user.role === 'copropietaire') return res.status(403).json({ error: 'Accès refusé' });
-    const paiement = db.prepare('SELECT id FROM cotisation_paiements WHERE id = ?').get(req.params.id);
-    if (!paiement) return res.status(404).json({ error: 'Paiement introuvable' });
+    const cotisation = db.prepare('SELECT id FROM cotisations WHERE id = ?').get(req.params.id);
+    if (!cotisation) return res.status(404).json({ error: 'Cotisation introuvable' });
     if (!req.file) return res.status(400).json({ error: 'Fichier manquant ou type non autorisé (images/PDF)' });
 
     const result = db.prepare(
-      'INSERT INTO paiement_preuves (paiement_id, filename, original_name, mimetype) VALUES (?, ?, ?, ?)'
+      'INSERT INTO cotisation_preuves (cotisation_id, filename, original_name, mimetype) VALUES (?, ?, ?, ?)'
     ).run(req.params.id, req.file.filename, req.file.originalname, req.file.mimetype);
 
-    const preuve = db.prepare('SELECT * FROM paiement_preuves WHERE id = ?').get(result.lastInsertRowid);
+    const preuve = db.prepare('SELECT * FROM cotisation_preuves WHERE id = ?').get(result.lastInsertRowid);
     res.status(201).json({ ...preuve, url: `/uploads/${preuve.filename}` });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -449,13 +445,13 @@ router.post('/cotisations/paiements/:id/preuves', authenticate, upload.single('f
 router.delete('/cotisations/preuves/:id', authenticate, (req, res) => {
   try {
     if (req.user.role === 'copropietaire') return res.status(403).json({ error: 'Accès refusé' });
-    const preuve = db.prepare('SELECT * FROM paiement_preuves WHERE id = ?').get(req.params.id);
+    const preuve = db.prepare('SELECT * FROM cotisation_preuves WHERE id = ?').get(req.params.id);
     if (!preuve) return res.status(404).json({ error: 'Preuve introuvable' });
 
     const filePath = path.join(uploadDir, preuve.filename);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
-    db.prepare('DELETE FROM paiement_preuves WHERE id = ?').run(req.params.id);
+    db.prepare('DELETE FROM cotisation_preuves WHERE id = ?').run(req.params.id);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
