@@ -108,6 +108,11 @@ function App() {
         <Route path="finances" element={<MBFinances />} />
         <Route path="budget" element={<MBBudget />} />
         <Route path="cotisations" element={<MBCotisations />} />
+        <Route path="profil" element={<MonProfil />} />
+        <Route path="residence" element={<MaResidence />} />
+        <Route path="mes-cotisations" element={<MesCotisations />} />
+        <Route path="mes-tickets" element={<MesTickets />} />
+        <Route path="mes-messages" element={<MesMessages />} />
       </Route>
 
       {/* Copropriétaire */}

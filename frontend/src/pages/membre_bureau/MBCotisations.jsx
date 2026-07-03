@@ -33,7 +33,7 @@ function MBCotisations() {
 
   useEffect(() => {
     if (!user?.copropriete_id) { setLoading(false); return; }
-    cotisationsApi.getAll({ copropriete_id: user.copropriete_id })
+    cotisationsApi.getAll({ copropriete_id: user.copropriete_id, scope: 'bureau' })
       .then(setList)
       .catch(() => {})
       .finally(() => setLoading(false));

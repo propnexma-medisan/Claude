@@ -119,7 +119,10 @@ router.get('/cotisations', authenticate, (req, res) => {
     }
 
     let rows;
-    if (req.user.role === 'copropietaire') {
+    // membre_bureau sans scope=bureau → vue personnelle, mêmes données que copropriétaire
+    const isPersonalView = req.user.role === 'copropietaire' ||
+      (req.user.role === 'membre_bureau' && req.query.scope !== 'bureau');
+    if (isPersonalView) {
       rows = db.prepare(`
         SELECT c.*,
           u.nom, u.prenom, u.email, u.telephone,
