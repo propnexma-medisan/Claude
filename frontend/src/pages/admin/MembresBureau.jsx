@@ -6,18 +6,25 @@ const emptyForm = { prenom: '', nom: '', email: '', password: '', telephone: '',
 function MembresBureau() {
   const [list, setList] = useState([]);
   const [copros, setCopros] = useState([]);
+  const [allCopros, setAllCopros] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showPromotModal, setShowPromotModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [promotSearch, setPromotSearch] = useState('');
+  const [selectedCopro, setSelectedCopro] = useState(null);
+  const [promoting, setPromoting] = useState(false);
+  const [promotError, setPromotError] = useState(null);
 
   const load = () => {
     Promise.all([users.getAll(), coproApi.getAll()])
-      .then(([all, allCopros]) => {
+      .then(([all, allC]) => {
         setList(all.filter((u) => u.role === 'membre_bureau'));
-        setCopros(allCopros);
+        setAllCopros(all.filter((u) => u.role === 'copropietaire'));
+        setCopros(allC);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -37,6 +44,13 @@ function MembresBureau() {
     setForm({ prenom: u.prenom, nom: u.nom, email: u.email, password: '', telephone: u.telephone || '', copropriete_id: u.copropriete_id || '' });
     setError(null);
     setShowModal(true);
+  };
+
+  const openPromot = () => {
+    setPromotSearch('');
+    setSelectedCopro(null);
+    setPromotError(null);
+    setShowPromotModal(true);
   };
 
   const submit = async (e) => {
@@ -60,6 +74,26 @@ function MembresBureau() {
     }
   };
 
+  const promote = async () => {
+    if (!selectedCopro) return;
+    setPromoting(true);
+    setPromotError(null);
+    try {
+      await users.update(selectedCopro.id, { role: 'membre_bureau', copropriete_id: selectedCopro.copropriete_id });
+      load();
+      setShowPromotModal(false);
+    } catch (err) {
+      setPromotError(err.message);
+    } finally {
+      setPromoting(false);
+    }
+  };
+
+  const demote = async (u) => {
+    if (!confirm(`Rétrograder ${u.prenom} ${u.nom} en copropriétaire ?`)) return;
+    try { await users.update(u.id, { role: 'copropietaire' }); load(); } catch (err) { alert(err.message); }
+  };
+
   const del = async (id) => {
     if (!confirm('Supprimer ce membre du bureau ?')) return;
     try { await users.delete(id); load(); } catch (err) { alert(err.message); }
@@ -71,6 +105,11 @@ function MembresBureau() {
 
   const getCoproNom = (id) => copros.find((c) => c.id === id)?.nom || '—';
 
+  const filteredCopros = allCopros.filter((u) => {
+    const q = promotSearch.toLowerCase();
+    return !q || `${u.prenom} ${u.nom} ${u.email} ${u.copropriete_nom || ''}`.toLowerCase().includes(q);
+  });
+
   if (loading) return <div className="flex justify-center py-16"><div className="animate-spin w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full" /></div>;
 
   return (
@@ -78,12 +117,18 @@ function MembresBureau() {
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Membres du bureau syndical</h1>
-          <p className="text-sm text-gray-500 mt-1">Accès lecture seule : finances, budget, cotisations</p>
+          <p className="text-sm text-gray-500 mt-1">Accès lecture seule : finances, budget, cotisations + espace personnel copropriétaire</p>
         </div>
-        <button onClick={openCreate} className="flex items-center gap-2 bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-          Ajouter un membre
-        </button>
+        <div className="flex gap-2">
+          <button onClick={openPromot} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" /></svg>
+            Promouvoir un copropriétaire
+          </button>
+          <button onClick={openCreate} className="flex items-center gap-2 bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            Nouveau membre
+          </button>
+        </div>
       </div>
 
       {list.length === 0 ? (
@@ -131,6 +176,9 @@ function MembresBureau() {
                       <button onClick={() => toggle(u)} title={u.is_active ? 'Désactiver' : 'Activer'} className={`text-xs px-2 py-1 rounded border transition-colors ${u.is_active ? 'border-gray-200 text-gray-500 hover:bg-gray-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}>
                         {u.is_active ? 'Désactiver' : 'Activer'}
                       </button>
+                      <button onClick={() => demote(u)} title="Rétrograder en copropriétaire" className="text-xs px-2 py-1 rounded border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors">
+                        Copropriétaire
+                      </button>
                       <button onClick={() => openEdit(u)} className="text-gray-400 hover:text-blue-600 transition-colors">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                       </button>
@@ -146,12 +194,12 @@ function MembresBureau() {
         </div>
       )}
 
-      {/* Modal */}
+      {/* Create / Edit modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="font-semibold text-gray-800">{editing ? 'Modifier le membre' : 'Ajouter un membre du bureau'}</h2>
+              <h2 className="font-semibold text-gray-800">{editing ? 'Modifier le membre' : 'Nouveau membre du bureau'}</h2>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
@@ -194,6 +242,85 @@ function MembresBureau() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Promote copropriétaire modal */}
+      {showPromotModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold text-gray-800">Promouvoir un copropriétaire</h2>
+                <p className="text-xs text-gray-500 mt-0.5">Le copropriétaire conserve son compte et aura aussi accès au bureau syndical</p>
+              </div>
+              <button onClick={() => setShowPromotModal(false)} className="text-gray-400 hover:text-gray-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {promotError && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-3">{promotError}</div>}
+
+              <input
+                type="text"
+                value={promotSearch}
+                onChange={(e) => setPromotSearch(e.target.value)}
+                placeholder="Rechercher par nom, email ou résidence..."
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                autoFocus
+              />
+
+              <div className="max-h-72 overflow-y-auto border border-gray-100 rounded-lg divide-y divide-gray-50">
+                {filteredCopros.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-6">Aucun copropriétaire trouvé</p>
+                ) : filteredCopros.map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() => setSelectedCopro(u)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 transition-colors text-left ${selectedCopro?.id === u.id ? 'bg-blue-50 ring-1 ring-inset ring-blue-300' : ''}`}
+                  >
+                    <div className="w-8 h-8 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                      {u.prenom?.[0]}{u.nom?.[0]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800">{u.prenom} {u.nom}</p>
+                      <p className="text-xs text-gray-400 truncate">{u.email}</p>
+                    </div>
+                    {u.copropriete_nom && (
+                      <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full flex-shrink-0">{u.copropriete_nom}</span>
+                    )}
+                    {selectedCopro?.id === u.id && (
+                      <svg className="w-4 h-4 text-blue-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {selectedCopro && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+                  <strong>{selectedCopro.prenom} {selectedCopro.nom}</strong> aura accès au bureau syndical de <strong>{selectedCopro.copropriete_nom || 'sa résidence'}</strong> en lecture seule, tout en gardant son espace copropriétaire.
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button type="button" onClick={() => setShowPromotModal(false)} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600">Annuler</button>
+                <button
+                  type="button"
+                  onClick={promote}
+                  disabled={!selectedCopro || promoting}
+                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {promoting ? 'Promotion...' : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" /></svg>
+                      Promouvoir
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
