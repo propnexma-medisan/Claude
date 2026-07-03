@@ -318,6 +318,9 @@ try {
   )`);
 } catch {}
 
+// Flag bureau syndical pour copropriétaires (sans changer leur rôle)
+try { db.exec('ALTER TABLE users ADD COLUMN is_membre_bureau INTEGER DEFAULT 0'); } catch {}
+
 // Pièces jointes des messages de diffusion
 try {
   db.exec(`CREATE TABLE IF NOT EXISTS message_pieces_jointes (

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink, Outlet, Navigate } from 'react-router-dom';
+import { NavLink, Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const navItems = [
@@ -53,6 +53,7 @@ const navItems = [
 
 function CopropietaireLayout() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (!user || user.role !== 'copropietaire') {
@@ -141,6 +142,17 @@ function CopropietaireLayout() {
               <p className="text-xs text-blue-300 truncate">{user.email}</p>
             </div>
           </div>
+          {user.is_membre_bureau ? (
+            <button
+              onClick={() => navigate('/membre-bureau')}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-amber-300 hover:text-white hover:bg-amber-600/20 rounded-lg transition-colors mb-1 border border-amber-500/30"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+              Vue bureau syndical
+            </button>
+          ) : null}
           <button
             onClick={logout}
             className="w-full flex items-center gap-2 px-3 py-2 text-sm text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors"

@@ -52,6 +52,7 @@ function signToken(user) {
       nom: user.nom,
       prenom: user.prenom,
       email: user.email,
+      is_membre_bureau: user.is_membre_bureau || 0,
     },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRES }

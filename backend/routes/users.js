@@ -11,7 +11,7 @@ const router = express.Router();
 router.get('/', authenticate, requireRole('admin'), (req, res) => {
   try {
     const list = db.prepare(`
-      SELECT u.id, u.nom, u.prenom, u.email, u.role, u.copropriete_id, u.lot_id, u.telephone, u.created_at, u.is_active,
+      SELECT u.id, u.nom, u.prenom, u.email, u.role, u.copropriete_id, u.lot_id, u.telephone, u.created_at, u.is_active, u.is_membre_bureau,
              c.nom as copropriete_nom
       FROM users u
       LEFT JOIN coproprietes c ON u.copropriete_id = c.id
@@ -168,7 +168,7 @@ router.put('/:id', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
-    const { nom, prenom, email, telephone, password, copropriete_id, copropriete_ids, lot_id, role, is_active } = req.body;
+    const { nom, prenom, email, telephone, password, copropriete_id, copropriete_ids, lot_id, role, is_active, is_membre_bureau } = req.body;
 
     let password_hash = existing.password_hash;
     if (password) {
@@ -180,6 +180,7 @@ router.put('/:id', authenticate, async (req, res) => {
     const newRole = isAdmin ? (role || existing.role) : existing.role;
     const newLotId = (isAdmin || isGestionnaireManaging) ? (lot_id !== undefined ? lot_id : existing.lot_id) : existing.lot_id;
     const newIsActive = isAdmin ? (is_active !== undefined ? is_active : existing.is_active) : existing.is_active;
+    const newIsMembreBureau = isAdmin ? (is_membre_bureau !== undefined ? is_membre_bureau : existing.is_membre_bureau) : existing.is_membre_bureau;
 
     // Determine primary copropriete_id for gestionnaire
     let newCoproId = existing.copropriete_id;
@@ -193,7 +194,7 @@ router.put('/:id', authenticate, async (req, res) => {
 
     db.prepare(`
       UPDATE users SET nom = ?, prenom = ?, email = ?, telephone = ?, password_hash = ?,
-        copropriete_id = ?, lot_id = ?, role = ?, is_active = ?
+        copropriete_id = ?, lot_id = ?, role = ?, is_active = ?, is_membre_bureau = ?
       WHERE id = ?
     `).run(
       nom || existing.nom,
@@ -205,6 +206,7 @@ router.put('/:id', authenticate, async (req, res) => {
       newLotId || null,
       newRole,
       newIsActive,
+      newIsMembreBureau,
       id
     );
 

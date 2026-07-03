@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink, Outlet, Navigate } from 'react-router-dom';
+import { NavLink, Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const bureauNav = [
@@ -110,9 +110,11 @@ function NavSection({ items, activeClass }) {
 
 function MembreBureauLayout() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  if (!user || user.role !== 'membre_bureau') {
+  const hasBureauAccess = user && (user.role === 'membre_bureau' || (user.role === 'copropietaire' && user.is_membre_bureau));
+  if (!hasBureauAccess) {
     return <Navigate to="/login" replace />;
   }
 
@@ -178,6 +180,14 @@ function MembreBureauLayout() {
               <p className="text-xs text-blue-300 truncate">{user.email}</p>
             </div>
           </div>
+          {user.role === 'copropietaire' && (
+            <button onClick={() => navigate('/copropietaire')} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors mb-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+              Vue copropriétaire
+            </button>
+          )}
           <button onClick={logout} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

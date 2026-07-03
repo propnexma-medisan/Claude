@@ -114,14 +114,15 @@ router.get('/cotisations', authenticate, (req, res) => {
     const { copropriete_id } = req.query;
     if (!copropriete_id) return res.status(400).json({ error: 'copropriete_id requis' });
 
-    if (req.user.role === 'membre_bureau' && req.user.copropriete_id !== parseInt(copropriete_id)) {
+    const canSeeBureau = req.user.role === 'membre_bureau' ||
+      (req.user.role === 'copropietaire' && req.user.is_membre_bureau);
+    if (canSeeBureau && req.user.copropriete_id !== parseInt(copropriete_id)) {
       return res.status(403).json({ error: 'Accès refusé à cette résidence' });
     }
 
     let rows;
-    // membre_bureau sans scope=bureau → vue personnelle, mêmes données que copropriétaire
-    const isPersonalView = req.user.role === 'copropietaire' ||
-      (req.user.role === 'membre_bureau' && req.query.scope !== 'bureau');
+    // bureau view only when user has bureau access AND passes scope=bureau
+    const isPersonalView = !canSeeBureau || req.query.scope !== 'bureau';
     if (isPersonalView) {
       rows = db.prepare(`
         SELECT c.*,

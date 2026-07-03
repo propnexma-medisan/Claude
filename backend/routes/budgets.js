@@ -25,11 +25,12 @@ const CATEGORIES_BUDGET = [
 ];
 
 // Helper: check access to a copropriete_id
-// write=true blocks membre_bureau (read-only role)
+// write=true blocks membre_bureau and copropriétaires with bureau access (read-only)
 function canAccessCopropriete(user, coproprieteId, write = false) {
   if (user.role === 'admin') return true;
   if (user.role === 'gestionnaire') return canGestionnaireAccessResidence(user.id, coproprieteId);
   if (user.role === 'membre_bureau') return !write && user.copropriete_id === parseInt(coproprieteId);
+  if (user.role === 'copropietaire' && user.is_membre_bureau) return !write && user.copropriete_id === parseInt(coproprieteId);
   return false;
 }
 

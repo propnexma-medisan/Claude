@@ -22,8 +22,8 @@ function MembresBureau() {
   const load = () => {
     Promise.all([users.getAll(), coproApi.getAll()])
       .then(([all, allC]) => {
-        setList(all.filter((u) => u.role === 'membre_bureau'));
-        setAllCopros(all.filter((u) => u.role === 'copropietaire'));
+        setList(all.filter((u) => u.role === 'membre_bureau' || (u.role === 'copropietaire' && u.is_membre_bureau)));
+        setAllCopros(all.filter((u) => u.role === 'copropietaire' && !u.is_membre_bureau));
         setCopros(allC);
       })
       .catch(() => {})
@@ -79,7 +79,7 @@ function MembresBureau() {
     setPromoting(true);
     setPromotError(null);
     try {
-      await users.update(selectedCopro.id, { role: 'membre_bureau', copropriete_id: selectedCopro.copropriete_id });
+      await users.update(selectedCopro.id, { is_membre_bureau: 1 });
       load();
       setShowPromotModal(false);
     } catch (err) {
@@ -90,8 +90,13 @@ function MembresBureau() {
   };
 
   const demote = async (u) => {
-    if (!confirm(`Rétrograder ${u.prenom} ${u.nom} en copropriétaire ?`)) return;
-    try { await users.update(u.id, { role: 'copropietaire' }); load(); } catch (err) { alert(err.message); }
+    if (u.role === 'copropietaire') {
+      if (!confirm(`Retirer l'accès bureau syndical à ${u.prenom} ${u.nom} ? Leur compte copropriétaire reste intact.`)) return;
+      try { await users.update(u.id, { is_membre_bureau: 0 }); load(); } catch (err) { alert(err.message); }
+    } else {
+      if (!confirm(`Supprimer le compte bureau syndical de ${u.prenom} ${u.nom} ?`)) return;
+      try { await users.delete(u.id); load(); } catch (err) { alert(err.message); }
+    }
   };
 
   const del = async (id) => {
@@ -144,6 +149,7 @@ function MembresBureau() {
                 <th className="px-4 py-3 font-medium">Email</th>
                 <th className="px-4 py-3 font-medium">Téléphone</th>
                 <th className="px-4 py-3 font-medium">Résidence</th>
+                <th className="px-4 py-3 font-medium">Type</th>
                 <th className="px-4 py-3 font-medium">Statut</th>
                 <th className="px-4 py-3 font-medium text-right">Actions</th>
               </tr>
@@ -167,6 +173,13 @@ function MembresBureau() {
                     ) : '—'}
                   </td>
                   <td className="px-4 py-3">
+                    {u.role === 'copropietaire' ? (
+                      <span className="inline-flex px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">Copropriétaire</span>
+                    ) : (
+                      <span className="inline-flex px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full text-xs font-medium">Dédié bureau</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${u.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                       {u.is_active ? 'Actif' : 'Inactif'}
                     </span>
@@ -176,15 +189,25 @@ function MembresBureau() {
                       <button onClick={() => toggle(u)} title={u.is_active ? 'Désactiver' : 'Activer'} className={`text-xs px-2 py-1 rounded border transition-colors ${u.is_active ? 'border-gray-200 text-gray-500 hover:bg-gray-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}>
                         {u.is_active ? 'Désactiver' : 'Activer'}
                       </button>
-                      <button onClick={() => demote(u)} title="Rétrograder en copropriétaire" className="text-xs px-2 py-1 rounded border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors">
-                        Copropriétaire
-                      </button>
-                      <button onClick={() => openEdit(u)} className="text-gray-400 hover:text-blue-600 transition-colors">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                      </button>
-                      <button onClick={() => del(u.id)} className="text-gray-400 hover:text-red-600 transition-colors">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      </button>
+                      {u.role === 'copropietaire' ? (
+                        <button onClick={() => demote(u)} title="Retirer accès bureau" className="text-xs px-2 py-1 rounded border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors">
+                          Retirer accès
+                        </button>
+                      ) : (
+                        <button onClick={() => demote(u)} title="Supprimer ce compte bureau" className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors">
+                          Supprimer
+                        </button>
+                      )}
+                      {u.role !== 'copropietaire' && (
+                        <button onClick={() => openEdit(u)} className="text-gray-400 hover:text-blue-600 transition-colors">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                        </button>
+                      )}
+                      {u.role !== 'copropietaire' && (
+                        <button onClick={() => del(u.id)} className="text-gray-400 hover:text-red-600 transition-colors">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
