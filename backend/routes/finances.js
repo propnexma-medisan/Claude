@@ -50,6 +50,9 @@ router.get('/:coproprieteId', authenticate, (req, res) => {
     if (req.user.role === 'copropietaire' && req.user.copropriete_id !== parseInt(coproprieteId)) {
       return res.status(403).json({ error: 'Accès refusé à cette résidence' });
     }
+    if (req.user.role === 'membre_bureau' && req.user.copropriete_id !== parseInt(coproprieteId)) {
+      return res.status(403).json({ error: 'Accès refusé à cette résidence' });
+    }
 
     const copropriete = db.prepare('SELECT * FROM coproprietes WHERE id = ?').get(coproprieteId);
     if (!copropriete) return res.status(404).json({ error: 'Résidence non trouvée' });

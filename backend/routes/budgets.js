@@ -25,9 +25,11 @@ const CATEGORIES_BUDGET = [
 ];
 
 // Helper: check access to a copropriete_id
-function canAccessCopropriete(user, coproprieteId) {
+// write=true blocks membre_bureau (read-only role)
+function canAccessCopropriete(user, coproprieteId, write = false) {
   if (user.role === 'admin') return true;
   if (user.role === 'gestionnaire') return canGestionnaireAccessResidence(user.id, coproprieteId);
+  if (user.role === 'membre_bureau') return !write && user.copropriete_id === parseInt(coproprieteId);
   return false;
 }
 
@@ -38,7 +40,7 @@ router.get('/budgets', authenticate, (req, res) => {
   try {
     const { copropriete_id } = req.query;
     if (!copropriete_id) return res.status(400).json({ error: 'copropriete_id requis' });
-    if (!canAccessCopropriete(req.user, copropriete_id)) {
+    if (!canAccessCopropriete(req.user, copropriete_id, req.method !== "GET")) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
@@ -61,7 +63,7 @@ router.post('/budgets', authenticate, (req, res) => {
   try {
     const { copropriete_id, annee, notes } = req.body;
     if (!copropriete_id || !annee) return res.status(400).json({ error: 'copropriete_id et annee requis' });
-    if (!canAccessCopropriete(req.user, copropriete_id)) {
+    if (!canAccessCopropriete(req.user, copropriete_id, req.method !== "GET")) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
@@ -95,7 +97,7 @@ router.get('/budgets/:id', authenticate, (req, res) => {
   try {
     const budget = db.prepare('SELECT * FROM budgets WHERE id = ?').get(req.params.id);
     if (!budget) return res.status(404).json({ error: 'Budget non trouvé' });
-    if (!canAccessCopropriete(req.user, budget.copropriete_id)) {
+    if (!canAccessCopropriete(req.user, budget.copropriete_id, req.method !== "GET")) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
@@ -111,7 +113,7 @@ router.put('/budgets/:id', authenticate, (req, res) => {
   try {
     const budget = db.prepare('SELECT * FROM budgets WHERE id = ?').get(req.params.id);
     if (!budget) return res.status(404).json({ error: 'Budget non trouvé' });
-    if (!canAccessCopropriete(req.user, budget.copropriete_id)) {
+    if (!canAccessCopropriete(req.user, budget.copropriete_id, req.method !== "GET")) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
@@ -135,7 +137,7 @@ router.delete('/budgets/:id', authenticate, (req, res) => {
   try {
     const budget = db.prepare('SELECT * FROM budgets WHERE id = ?').get(req.params.id);
     if (!budget) return res.status(404).json({ error: 'Budget non trouvé' });
-    if (!canAccessCopropriete(req.user, budget.copropriete_id)) {
+    if (!canAccessCopropriete(req.user, budget.copropriete_id, req.method !== "GET")) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
     if (budget.statut !== 'Brouillon') {
@@ -156,7 +158,7 @@ router.get('/budgets/:id/lignes', authenticate, (req, res) => {
   try {
     const budget = db.prepare('SELECT * FROM budgets WHERE id = ?').get(req.params.id);
     if (!budget) return res.status(404).json({ error: 'Budget non trouvé' });
-    if (!canAccessCopropriete(req.user, budget.copropriete_id)) {
+    if (!canAccessCopropriete(req.user, budget.copropriete_id, req.method !== "GET")) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
@@ -172,7 +174,7 @@ router.put('/budgets/:id/lignes/:ligneId', authenticate, (req, res) => {
   try {
     const budget = db.prepare('SELECT * FROM budgets WHERE id = ?').get(req.params.id);
     if (!budget) return res.status(404).json({ error: 'Budget non trouvé' });
-    if (!canAccessCopropriete(req.user, budget.copropriete_id)) {
+    if (!canAccessCopropriete(req.user, budget.copropriete_id, req.method !== "GET")) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
@@ -228,7 +230,7 @@ router.get('/budgets/:id/synthese', authenticate, (req, res) => {
   try {
     const budget = db.prepare('SELECT * FROM budgets WHERE id = ?').get(req.params.id);
     if (!budget) return res.status(404).json({ error: 'Budget non trouvé' });
-    if (!canAccessCopropriete(req.user, budget.copropriete_id)) {
+    if (!canAccessCopropriete(req.user, budget.copropriete_id, req.method !== "GET")) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
@@ -291,7 +293,7 @@ router.get('/depenses', authenticate, (req, res) => {
   try {
     const { copropriete_id, annee, categorie } = req.query;
     if (!copropriete_id) return res.status(400).json({ error: 'copropriete_id requis' });
-    if (!canAccessCopropriete(req.user, copropriete_id)) {
+    if (!canAccessCopropriete(req.user, copropriete_id, req.method !== "GET")) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
@@ -328,7 +330,7 @@ router.post('/depenses', authenticate, (req, res) => {
     if (!copropriete_id || !categorie || !libelle || montant === undefined || !date_depense) {
       return res.status(400).json({ error: 'Champs requis manquants' });
     }
-    if (!canAccessCopropriete(req.user, copropriete_id)) {
+    if (!canAccessCopropriete(req.user, copropriete_id, req.method !== "GET")) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
@@ -353,7 +355,7 @@ router.put('/depenses/:id', authenticate, (req, res) => {
   try {
     const depense = db.prepare('SELECT * FROM depenses WHERE id = ?').get(req.params.id);
     if (!depense) return res.status(404).json({ error: 'Dépense non trouvée' });
-    if (!canAccessCopropriete(req.user, depense.copropriete_id)) {
+    if (!canAccessCopropriete(req.user, depense.copropriete_id, req.method !== "GET")) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
@@ -394,7 +396,7 @@ router.delete('/depenses/:id', authenticate, (req, res) => {
   try {
     const depense = db.prepare('SELECT * FROM depenses WHERE id = ?').get(req.params.id);
     if (!depense) return res.status(404).json({ error: 'Dépense non trouvée' });
-    if (!canAccessCopropriete(req.user, depense.copropriete_id)) {
+    if (!canAccessCopropriete(req.user, depense.copropriete_id, req.method !== "GET")) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
@@ -412,7 +414,7 @@ router.get('/appels-fonds', authenticate, (req, res) => {
   try {
     const { copropriete_id } = req.query;
     if (!copropriete_id) return res.status(400).json({ error: 'copropriete_id requis' });
-    if (!canAccessCopropriete(req.user, copropriete_id)) {
+    if (!canAccessCopropriete(req.user, copropriete_id, req.method !== "GET")) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
@@ -437,7 +439,7 @@ router.post('/appels-fonds', authenticate, (req, res) => {
     if (!copropriete_id || !libelle || montant_total === undefined || !date_appel || !date_echeance) {
       return res.status(400).json({ error: 'Champs requis manquants' });
     }
-    if (!canAccessCopropriete(req.user, copropriete_id)) {
+    if (!canAccessCopropriete(req.user, copropriete_id, req.method !== "GET")) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
@@ -479,7 +481,7 @@ router.put('/appels-fonds/:id', authenticate, (req, res) => {
   try {
     const appel = db.prepare('SELECT * FROM appels_fonds WHERE id = ?').get(req.params.id);
     if (!appel) return res.status(404).json({ error: 'Appel de fonds non trouvé' });
-    if (!canAccessCopropriete(req.user, appel.copropriete_id)) {
+    if (!canAccessCopropriete(req.user, appel.copropriete_id, req.method !== "GET")) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
@@ -513,7 +515,7 @@ router.delete('/appels-fonds/:id', authenticate, (req, res) => {
   try {
     const appel = db.prepare('SELECT * FROM appels_fonds WHERE id = ?').get(req.params.id);
     if (!appel) return res.status(404).json({ error: 'Appel de fonds non trouvé' });
-    if (!canAccessCopropriete(req.user, appel.copropriete_id)) {
+    if (!canAccessCopropriete(req.user, appel.copropriete_id, req.method !== "GET")) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 

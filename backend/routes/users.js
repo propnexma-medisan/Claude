@@ -79,9 +79,9 @@ router.post('/', authenticate, async (req, res) => {
     const isAdmin = req.user.role === 'admin';
     const isGestionnaire = req.user.role === 'gestionnaire';
 
-    // Gestionnaire can only create copropietaires for their own residences
+    // Gestionnaire can only create copropietaires or membres du bureau for their own residences
     if (isGestionnaire) {
-      if (role !== 'copropietaire') {
+      if (role !== 'copropietaire' && role !== 'membre_bureau') {
         return res.status(403).json({ error: 'Accès refusé : rôle insuffisant' });
       }
       if (!canGestionnaireAccessResidence(req.user.id, copropriete_id)) {
@@ -91,7 +91,7 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Accès refusé : rôle insuffisant' });
     }
 
-    const validRoles = ['gestionnaire', 'copropietaire', 'admin'];
+    const validRoles = ['gestionnaire', 'copropietaire', 'admin', 'membre_bureau'];
     if (!validRoles.includes(role)) {
       return res.status(400).json({ error: 'Rôle invalide' });
     }

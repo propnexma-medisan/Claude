@@ -114,6 +114,10 @@ router.get('/cotisations', authenticate, (req, res) => {
     const { copropriete_id } = req.query;
     if (!copropriete_id) return res.status(400).json({ error: 'copropriete_id requis' });
 
+    if (req.user.role === 'membre_bureau' && req.user.copropriete_id !== parseInt(copropriete_id)) {
+      return res.status(403).json({ error: 'Accès refusé à cette résidence' });
+    }
+
     let rows;
     if (req.user.role === 'copropietaire') {
       rows = db.prepare(`
@@ -197,7 +201,7 @@ router.get('/cotisations/:id', authenticate, (req, res) => {
 // POST /api/cotisations
 router.post('/cotisations', authenticate, (req, res) => {
   try {
-    if (req.user.role === 'copropietaire') return res.status(403).json({ error: 'Accès refusé' });
+    if (req.user.role === 'copropietaire' || req.user.role === 'membre_bureau') return res.status(403).json({ error: 'Accès refusé' });
 
     const { copropriete_id, user_id, lot_id, montant_mensuel, date_debut, date_fin, notes } = req.body;
     if (!copropriete_id || !user_id || !montant_mensuel || !date_debut || !date_fin) {
@@ -239,7 +243,7 @@ router.post('/cotisations', authenticate, (req, res) => {
 // PUT /api/cotisations/:id
 router.put('/cotisations/:id', authenticate, (req, res) => {
   try {
-    if (req.user.role === 'copropietaire') return res.status(403).json({ error: 'Accès refusé' });
+    if (req.user.role === 'copropietaire' || req.user.role === 'membre_bureau') return res.status(403).json({ error: 'Accès refusé' });
 
     const existing = db.prepare('SELECT * FROM cotisations WHERE id = ?').get(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Cotisation introuvable' });
@@ -294,7 +298,7 @@ router.put('/cotisations/:id', authenticate, (req, res) => {
 // DELETE /api/cotisations/:id
 router.delete('/cotisations/:id', authenticate, (req, res) => {
   try {
-    if (req.user.role === 'copropietaire') return res.status(403).json({ error: 'Accès refusé' });
+    if (req.user.role === 'copropietaire' || req.user.role === 'membre_bureau') return res.status(403).json({ error: 'Accès refusé' });
     const existing = db.prepare('SELECT id FROM cotisations WHERE id = ?').get(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Cotisation introuvable' });
     // Nullify foreign key in relances before deleting (no CASCADE on that FK)
@@ -311,7 +315,7 @@ router.delete('/cotisations/:id', authenticate, (req, res) => {
 // PUT /api/cotisations/paiements/:id
 router.put('/cotisations/paiements/:id', authenticate, (req, res) => {
   try {
-    if (req.user.role === 'copropietaire') return res.status(403).json({ error: 'Accès refusé' });
+    if (req.user.role === 'copropietaire' || req.user.role === 'membre_bureau') return res.status(403).json({ error: 'Accès refusé' });
     const existing = db.prepare('SELECT * FROM cotisation_paiements WHERE id = ?').get(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Paiement introuvable' });
 
@@ -360,7 +364,7 @@ router.get('/relances/mes-relances', authenticate, (req, res) => {
 // GET /api/relances?copropriete_id=X
 router.get('/relances', authenticate, (req, res) => {
   try {
-    if (req.user.role === 'copropietaire') return res.status(403).json({ error: 'Accès refusé' });
+    if (req.user.role === 'copropietaire' || req.user.role === 'membre_bureau') return res.status(403).json({ error: 'Accès refusé' });
     const { copropriete_id } = req.query;
     if (!copropriete_id) return res.status(400).json({ error: 'copropriete_id requis' });
     const rows = db.prepare(`
@@ -379,7 +383,7 @@ router.get('/relances', authenticate, (req, res) => {
 // POST /api/relances
 router.post('/relances', authenticate, (req, res) => {
   try {
-    if (req.user.role === 'copropietaire') return res.status(403).json({ error: 'Accès refusé' });
+    if (req.user.role === 'copropietaire' || req.user.role === 'membre_bureau') return res.status(403).json({ error: 'Accès refusé' });
     const { copropriete_id, user_id, cotisation_id, type, objet, message } = req.body;
     if (!copropriete_id || !user_id || !type || !objet || !message) {
       return res.status(400).json({ error: 'Champs obligatoires manquants' });
@@ -425,7 +429,7 @@ router.post('/relances', authenticate, (req, res) => {
 // POST /api/cotisations/:id/preuves
 router.post('/cotisations/:id/preuves', authenticate, upload.single('file'), (req, res) => {
   try {
-    if (req.user.role === 'copropietaire') return res.status(403).json({ error: 'Accès refusé' });
+    if (req.user.role === 'copropietaire' || req.user.role === 'membre_bureau') return res.status(403).json({ error: 'Accès refusé' });
     const cotisation = db.prepare('SELECT id FROM cotisations WHERE id = ?').get(req.params.id);
     if (!cotisation) return res.status(404).json({ error: 'Cotisation introuvable' });
     if (!req.file) return res.status(400).json({ error: 'Fichier manquant ou type non autorisé (images/PDF)' });
@@ -444,7 +448,7 @@ router.post('/cotisations/:id/preuves', authenticate, upload.single('file'), (re
 // DELETE /api/cotisations/preuves/:id
 router.delete('/cotisations/preuves/:id', authenticate, (req, res) => {
   try {
-    if (req.user.role === 'copropietaire') return res.status(403).json({ error: 'Accès refusé' });
+    if (req.user.role === 'copropietaire' || req.user.role === 'membre_bureau') return res.status(403).json({ error: 'Accès refusé' });
     const preuve = db.prepare('SELECT * FROM cotisation_preuves WHERE id = ?').get(req.params.id);
     if (!preuve) return res.status(404).json({ error: 'Preuve introuvable' });
 

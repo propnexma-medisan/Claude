@@ -38,6 +38,16 @@ import MesCotisations from './pages/copropietaire/MesCotisations';
 import MesTickets from './pages/copropietaire/MesTickets';
 import MesMessages from './pages/copropietaire/MesMessages';
 
+// Membre bureau pages
+import MembreBureauLayout from './components/MembreBureauLayout';
+import MBDashboard from './pages/membre_bureau/MBDashboard';
+import MBFinances from './pages/membre_bureau/MBFinances';
+import MBBudget from './pages/membre_bureau/MBBudget';
+import MBCotisations from './pages/membre_bureau/MBCotisations';
+
+// Admin: membres bureau
+import MembresBureau from './pages/admin/MembresBureau';
+
 function RootRedirect() {
   const { user, isAuthenticated, loading } = useAuth();
 
@@ -53,6 +63,7 @@ function RootRedirect() {
 
   if (user.role === 'admin') return <Navigate to="/admin" replace />;
   if (user.role === 'gestionnaire') return <Navigate to="/gestionnaire" replace />;
+  if (user.role === 'membre_bureau') return <Navigate to="/membre-bureau" replace />;
   return <Navigate to="/copropietaire" replace />;
 }
 
@@ -75,6 +86,7 @@ function App() {
         <Route path="tickets" element={<AdminTickets />} />
         <Route path="budgets" element={<AdminBudgets />} />
         <Route path="communications" element={<AdminCommunications />} />
+        <Route path="membres-bureau" element={<MembresBureau />} />
       </Route>
 
       {/* Gestionnaire */}
@@ -88,6 +100,14 @@ function App() {
         <Route path="tickets" element={<GestTickets />} />
         <Route path="lots" element={<Lots />} />
         <Route path="fournisseurs" element={<Fournisseurs />} />
+      </Route>
+
+      {/* Membre bureau syndical */}
+      <Route path="/membre-bureau" element={<MembreBureauLayout />}>
+        <Route index element={<MBDashboard />} />
+        <Route path="finances" element={<MBFinances />} />
+        <Route path="budget" element={<MBBudget />} />
+        <Route path="cotisations" element={<MBCotisations />} />
       </Route>
 
       {/* Copropriétaire */}
