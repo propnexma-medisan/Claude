@@ -36,6 +36,7 @@ import MonProfil from './pages/copropietaire/MonProfil';
 import MaResidence from './pages/copropietaire/MaResidence';
 import MesCotisations from './pages/copropietaire/MesCotisations';
 import MesTickets from './pages/copropietaire/MesTickets';
+import MesMessages from './pages/copropietaire/MesMessages';
 
 function RootRedirect() {
   const { user, isAuthenticated, loading } = useAuth();
@@ -95,6 +96,7 @@ function App() {
         <Route path="residence" element={<MaResidence />} />
         <Route path="cotisations" element={<MesCotisations />} />
         <Route path="tickets" element={<MesTickets />} />
+        <Route path="messages" element={<MesMessages />} />
       </Route>
 
       {/* Fallback */}

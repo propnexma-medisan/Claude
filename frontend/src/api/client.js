@@ -118,8 +118,16 @@ export const tickets = {
 // Messages de diffusion
 export const messages = {
   getAll: (coproprieteId) => api.get(coproprieteId ? `/messages?copropriete_id=${coproprieteId}` : '/messages'),
-  create: (data) => api.post('/messages', data),
+  create: (formData) => {
+    const token = getToken();
+    return fetch(`${BASE_URL}/messages`, {
+      method: 'POST',
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: formData,
+    }).then((r) => r.ok ? r.json() : r.json().then((e) => Promise.reject(new Error(e.error || 'Erreur'))));
+  },
   delete: (id) => api.delete(`/messages/${id}`),
+  deletePJ: (id) => api.delete(`/messages/pj/${id}`),
 };
 
 // Finances

@@ -318,4 +318,16 @@ try {
   )`);
 } catch {}
 
+// Pièces jointes des messages de diffusion
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS message_pieces_jointes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    message_id INTEGER NOT NULL REFERENCES messages_diffusion(id) ON DELETE CASCADE,
+    filename TEXT NOT NULL,
+    original_name TEXT NOT NULL,
+    mimetype TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+} catch {}
+
 module.exports = db;
