@@ -191,7 +191,7 @@ router.get('/cotisations/:id', authenticate, (req, res) => {
 
     const preuves = db.prepare(
       'SELECT id, filename, original_name, mimetype, created_at FROM cotisation_preuves WHERE cotisation_id = ? ORDER BY created_at ASC'
-    ).all(req.params.id).map((pr) => ({ ...pr, url: `/uploads/${pr.filename}` }));
+    ).all(req.params.id).map((pr) => ({ ...pr, url: `/api/uploads/${pr.filename}` }));
 
     const relancesData = db.prepare(`
       SELECT * FROM relances
@@ -446,7 +446,7 @@ router.post('/cotisations/:id/preuves', authenticate, upload.single('file'), (re
     ).run(req.params.id, req.file.filename, req.file.originalname, req.file.mimetype);
 
     const preuve = db.prepare('SELECT * FROM cotisation_preuves WHERE id = ?').get(result.lastInsertRowid);
-    res.status(201).json({ ...preuve, url: `/uploads/${preuve.filename}` });
+    res.status(201).json({ ...preuve, url: `/api/uploads/${preuve.filename}` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

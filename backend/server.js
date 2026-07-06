@@ -35,13 +35,14 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Serve uploaded files
+// Serve uploaded files — both paths so Nginx proxy (/api/uploads) and direct (/uploads) work
 app.use('/uploads', express.static(uploadDir));
+app.use('/api/uploads', express.static(uploadDir));
 
 // Upload endpoint (authenticated)
 app.post('/api/upload', authenticate, upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu' });
-  res.json({ url: `/uploads/${req.file.filename}` });
+  res.json({ url: `/api/uploads/${req.file.filename}` });
 });
 
 // All routes below require authentication

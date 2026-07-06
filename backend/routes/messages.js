@@ -34,7 +34,7 @@ function attachPJ(messages) {
   const byMsg = {};
   for (const pj of pjs) {
     if (!byMsg[pj.message_id]) byMsg[pj.message_id] = [];
-    byMsg[pj.message_id].push({ ...pj, url: `/uploads/${pj.filename}` });
+    byMsg[pj.message_id].push({ ...pj, url: `/api/uploads/${pj.filename}` });
   }
   return messages.map((m) => ({ ...m, pieces_jointes: byMsg[m.id] || [] }));
 }
@@ -133,7 +133,7 @@ router.post('/', authenticate, requireRole('gestionnaire', 'admin'), upload.arra
 
     const pjs = db.prepare(
       'SELECT * FROM message_pieces_jointes WHERE message_id = ? ORDER BY created_at ASC'
-    ).all(msgId).map((p) => ({ ...p, url: `/uploads/${p.filename}` }));
+    ).all(msgId).map((p) => ({ ...p, url: `/api/uploads/${p.filename}` }));
 
     // Email copropriétaires (non-blocking)
     const copropietaires = db.prepare(
