@@ -93,13 +93,19 @@ function Copropietaires() {
   };
 
   const sorted = [...list].sort((a, b) => {
-    let va, vb;
-    if (sortConfig.key === 'nom') { va = `${a.prenom} ${a.nom}`.toLowerCase(); vb = `${b.prenom} ${b.nom}`.toLowerCase(); }
-    else if (sortConfig.key === 'email') { va = a.email?.toLowerCase() || ''; vb = b.email?.toLowerCase() || ''; }
-    else if (sortConfig.key === 'lot') { va = a.lot_numero || ''; vb = b.lot_numero || ''; }
-    else if (sortConfig.key === 'statut') { va = a.is_active ? 1 : 0; vb = b.is_active ? 1 : 0; }
-    if (va < vb) return sortConfig.dir === 'asc' ? -1 : 1;
-    if (va > vb) return sortConfig.dir === 'asc' ? 1 : -1;
+    const dir = sortConfig.dir === 'asc' ? 1 : -1;
+    if (sortConfig.key === 'nom') {
+      return dir * `${a.prenom} ${a.nom}`.toLowerCase().localeCompare(`${b.prenom} ${b.nom}`.toLowerCase());
+    }
+    if (sortConfig.key === 'email') {
+      return dir * (a.email || '').toLowerCase().localeCompare((b.email || '').toLowerCase());
+    }
+    if (sortConfig.key === 'lot') {
+      return dir * (a.lot_numero || '').localeCompare(b.lot_numero || '', undefined, { numeric: true });
+    }
+    if (sortConfig.key === 'statut') {
+      return dir * ((a.is_active ? 1 : 0) - (b.is_active ? 1 : 0));
+    }
     return 0;
   });
 
