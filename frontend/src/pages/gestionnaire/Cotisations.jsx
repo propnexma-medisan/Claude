@@ -916,7 +916,9 @@ function Cotisations() {
       .then(([cotisationList, alerteData, userList]) => {
         setList(cotisationList);
         setAlertes(alerteData);
-        const copros = userList.filter((u) => u.role === 'copropietaire');
+        const copros = userList
+          .filter((u) => u.role === 'copropietaire')
+          .sort((a, b) => (a.lot_numero || '').localeCompare(b.lot_numero || '', undefined, { numeric: true }));
         setCoproUsers(copros);
         // Gather unique lots from user data
         const lotSet = new Map();
