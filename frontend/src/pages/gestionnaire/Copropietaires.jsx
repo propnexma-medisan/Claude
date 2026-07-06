@@ -86,6 +86,23 @@ function Copropietaires() {
     }
   };
 
+  const [sortConfig, setSortConfig] = useState({ key: 'nom', dir: 'asc' });
+
+  const toggleSort = (key) => {
+    setSortConfig((s) => ({ key, dir: s.key === key && s.dir === 'asc' ? 'desc' : 'asc' }));
+  };
+
+  const sorted = [...list].sort((a, b) => {
+    let va, vb;
+    if (sortConfig.key === 'nom') { va = `${a.prenom} ${a.nom}`.toLowerCase(); vb = `${b.prenom} ${b.nom}`.toLowerCase(); }
+    else if (sortConfig.key === 'email') { va = a.email?.toLowerCase() || ''; vb = b.email?.toLowerCase() || ''; }
+    else if (sortConfig.key === 'lot') { va = a.lot_numero || ''; vb = b.lot_numero || ''; }
+    else if (sortConfig.key === 'statut') { va = a.is_active ? 1 : 0; vb = b.is_active ? 1 : 0; }
+    if (va < vb) return sortConfig.dir === 'asc' ? -1 : 1;
+    if (va > vb) return sortConfig.dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
   const getLotLabel = (lotId) => {
     const lot = lots.find((l) => l.id === lotId);
     return lot ? `${lot.numero} (${lot.type})` : '—';
@@ -115,16 +132,35 @@ function Copropietaires() {
           <table className="w-full text-sm min-w-[600px]">
             <thead className="bg-gray-50">
               <tr>
-                {['Copropriétaire', 'Email', 'Téléphone', 'Lot', 'Statut', ''].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{h}</th>
+                {[
+                  { label: 'Copropriétaire', key: 'nom' },
+                  { label: 'Email', key: 'email' },
+                  { label: 'Téléphone', key: null },
+                  { label: 'Lot', key: 'lot' },
+                  { label: 'Statut', key: 'statut' },
+                  { label: '', key: null },
+                ].map(({ label, key }) => (
+                  <th key={label}
+                    className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase select-none ${key ? 'cursor-pointer hover:text-gray-800' : ''}`}
+                    onClick={() => key && toggleSort(key)}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      {label}
+                      {key && (
+                        <span className="text-gray-300">
+                          {sortConfig.key === key ? (sortConfig.dir === 'asc' ? '↑' : '↓') : '↕'}
+                        </span>
+                      )}
+                    </span>
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {list.length === 0 && (
+              {sorted.length === 0 && (
                 <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">Aucun copropriétaire</td></tr>
               )}
-              {list.map((u) => (
+              {sorted.map((u) => (
                 <tr key={u.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
