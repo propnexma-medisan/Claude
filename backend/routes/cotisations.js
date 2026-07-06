@@ -121,8 +121,11 @@ router.get('/cotisations', authenticate, (req, res) => {
     }
 
     let rows;
-    // bureau view only when user has bureau access AND passes scope=bureau
-    const isPersonalView = !canSeeBureau || req.query.scope !== 'bureau';
+    // personal view: bureau users without scope=bureau, or plain copropriétaires
+    // admin/gestionnaire always see all cotisations (isPersonalView = false)
+    const isPersonalView = canSeeBureau
+      ? req.query.scope !== 'bureau'
+      : req.user.role === 'copropietaire';
     if (isPersonalView) {
       rows = db.prepare(`
         SELECT c.*,
