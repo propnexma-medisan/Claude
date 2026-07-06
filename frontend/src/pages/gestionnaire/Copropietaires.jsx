@@ -141,15 +141,19 @@ function Copropietaires() {
                   { label: '', key: null },
                 ].map(({ label, key }) => (
                   <th key={label}
-                    className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase select-none ${key ? 'cursor-pointer hover:text-gray-800' : ''}`}
+                    className={`px-4 py-3 text-left text-xs font-medium uppercase select-none ${key ? 'cursor-pointer text-blue-600 hover:text-blue-800' : 'text-gray-500'}`}
                     onClick={() => key && toggleSort(key)}
                   >
                     <span className="inline-flex items-center gap-1">
                       {label}
                       {key && (
-                        <span className="text-gray-300">
-                          {sortConfig.key === key ? (sortConfig.dir === 'asc' ? '↑' : '↓') : '↕'}
-                        </span>
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          {sortConfig.key === key && sortConfig.dir === 'asc'
+                            ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
+                            : sortConfig.key === key && sortConfig.dir === 'desc'
+                            ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                            : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4M8 15l4 4 4-4" />}
+                        </svg>
                       )}
                     </span>
                   </th>
