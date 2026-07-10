@@ -339,7 +339,23 @@ async function sendAppelFonds({ to, prenom, residence, libelle, montant_total, d
 
 // ─── 7. Message broadcast (→ copropriétaires) ─────────────────────────────────
 
-async function sendMessageBroadcast({ to, prenom, residence, titre, contenu, gestionnaire_nom }) {
+async function sendMessageBroadcast({ to, prenom, residence, titre, contenu, gestionnaire_nom, pieces_jointes = [] }) {
+  const pjSection = pieces_jointes.length > 0 ? `
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px 20px;margin:16px 0;">
+      <div style="font-size:13px;font-weight:bold;color:#1e3a5f;margin-bottom:10px;">&#128206; Pièces jointes (${pieces_jointes.length})</div>
+      ${pieces_jointes.map((pj) => {
+        const isPdf = pj.mimetype === 'application/pdf';
+        const icon = isPdf ? '&#128196;' : '&#128247;';
+        const fileUrl = `${APP_URL}${pj.url}`;
+        return `<div style="margin-bottom:8px;">
+          <a href="${fileUrl}" style="display:inline-flex;align-items:center;gap:6px;color:#3b82f6;text-decoration:none;font-size:14px;font-weight:500;">
+            <span>${icon}</span>
+            <span style="text-decoration:underline;">${pj.original_name}</span>
+          </a>
+        </div>`;
+      }).join('')}
+    </div>` : '';
+
   const content = `
     <h2 style="color:#1e3a5f;margin-top:0;">Message de votre résidence</h2>
     <p style="color:#4b5563;font-size:15px;line-height:1.6;">
@@ -352,6 +368,8 @@ async function sendMessageBroadcast({ to, prenom, residence, titre, contenu, ges
       <div style="height:1px;background:#e2e8f0;margin-bottom:16px;"></div>
       <p style="color:#374151;font-size:15px;margin:0;line-height:1.7;white-space:pre-wrap;">${contenu}</p>
     </div>
+
+    ${pjSection}
 
     <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:12px 16px;margin:16px 0;font-size:13px;color:#065f46;">
       Message envoyé par <strong>${gestionnaire_nom || 'votre gestionnaire'}</strong> – Résidence ${residence}

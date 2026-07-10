@@ -148,6 +148,7 @@ router.post('/', authenticate, requireRole('gestionnaire', 'admin'), upload.arra
         titre,
         contenu,
         gestionnaire_nom: gestNom,
+        pieces_jointes: pjs,
       }).catch(console.error);
     }
 
