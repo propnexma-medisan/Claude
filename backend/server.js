@@ -58,6 +58,7 @@ const financesRouter = require('./routes/finances');
 const budgetsRouter = require('./routes/budgets');
 const cotisationsRouter = require('./routes/cotisations');
 const fournisseursRouter = require('./routes/fournisseurs');
+const recouvrementRouter = require('./routes/recouvrement');
 const adminRouter = require('./routes/admin');
 
 app.use('/api/coproprietes', authenticate, copropietesRouter);
@@ -72,6 +73,7 @@ app.use('/api/finances', financesRouter);
 app.use('/api', budgetsRouter);
 app.use('/api', cotisationsRouter);
 app.use('/api/fournisseurs', authenticate, fournisseursRouter);
+app.use('/api/recouvrement', authenticate, recouvrementRouter);
 app.use('/api/admin', authenticate, requireRole('admin'), adminRouter);
 
 // Dashboard stats (admin/gestionnaire)

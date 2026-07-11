@@ -321,6 +321,22 @@ try {
 // Flag bureau syndical pour copropriétaires (sans changer leur rôle)
 try { db.exec('ALTER TABLE users ADD COLUMN is_membre_bureau INTEGER DEFAULT 0'); } catch {}
 
+// Table recouvrement (actions email + lettres)
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS recouvrement_actions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    copropriete_id INTEGER NOT NULL REFERENCES coproprietes(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type TEXT NOT NULL CHECK(type IN ('Rappel','Relance','Mise en demeure')),
+    canal TEXT NOT NULL CHECK(canal IN ('Email','Lettre')),
+    statut TEXT NOT NULL DEFAULT 'Envoyé' CHECK(statut IN ('Envoyé','À déposer','Déposé')),
+    montant_du REAL,
+    notes TEXT,
+    created_by INTEGER REFERENCES users(id),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+} catch {}
+
 // Pièces jointes des messages de diffusion
 try {
   db.exec(`CREATE TABLE IF NOT EXISTS message_pieces_jointes (

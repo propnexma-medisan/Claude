@@ -208,6 +208,14 @@ export const fournisseurs = {
   deleteContrat: (id) => api.delete(`/fournisseurs/contrats/${id}`),
 };
 
+export const recouvrement = {
+  getDashboard: (coproprieteId) => api.get(`/recouvrement/dashboard?copropriete_id=${coproprieteId}`),
+  getActions: (coproprieteId, userId) => api.get(`/recouvrement/actions?copropriete_id=${coproprieteId}&user_id=${userId}`),
+  logAction: (data) => api.post('/recouvrement/actions', data),
+  markDeposee: (id) => api.put(`/recouvrement/actions/${id}/deposee`, {}),
+  sendEmail: (data) => api.post('/recouvrement/send-email', data),
+};
+
 export const adminApi = {
   getStats: () => api.get('/admin/stats'),
   getDashboard: () => api.get('/admin/dashboard'),
