@@ -147,15 +147,15 @@ router.post('/send-email', authenticate, requireRole('gestionnaire', 'admin'), a
     const templates = {
       'Rappel': {
         objet: `Rappel de paiement – ${copro?.nom}`,
-        message: `Nous vous informons que des cotisations sont en attente de règlement pour un montant de ${montantStr}.\n\nNous vous remercions de bien vouloir régulariser votre situation dans les meilleurs délais.`,
+        message: `Nous vous informons que des cotisations sont en attente de règlement pour un montant de ${montantStr} à ce jour.\n\nNous vous remercions de bien vouloir régulariser votre situation dans les meilleurs délais en utilisant l'un des modes de paiement indiqués ci-dessous.`,
       },
       'Relance': {
         objet: `Relance pour impayé – ${copro?.nom}`,
-        message: `Malgré notre précédent rappel, nous constatons que votre cotisation d'un montant de ${montantStr} reste impayée.\n\nNous vous demandons de procéder au règlement de cette somme dans les plus brefs délais afin d'éviter toute suite.`,
+        message: `Malgré notre précédent rappel, nous constatons que votre cotisation d'un montant de ${montantStr} à ce jour reste impayée.\n\nNous vous demandons de procéder au règlement de cette somme dans les plus brefs délais en utilisant l'un des modes de paiement indiqués ci-dessous, afin d'éviter toute suite.`,
       },
       'Mise en demeure': {
         objet: `Mise en demeure – ${copro?.nom}`,
-        message: `Nous avons le regret de constater que, malgré nos rappels successifs, votre cotisation d'un montant de ${montantStr} demeure impayée.\n\nPar la présente, nous vous mettons en demeure de régulariser votre situation dans un délai de 8 jours à compter de la réception de ce courrier, faute de quoi nous nous verrons contraints d'engager les procédures légales nécessaires au recouvrement de cette créance.`,
+        message: `Nous avons le regret de constater que, malgré nos rappels successifs, votre cotisation d'un montant de ${montantStr} à ce jour demeure impayée.\n\nPar la présente, nous vous mettons en demeure de régulariser votre situation dans un délai de 8 jours à compter de la réception de ce courrier, faute de quoi nous nous verrons contraints d'engager les procédures légales nécessaires au recouvrement de cette créance.`,
       },
     };
 

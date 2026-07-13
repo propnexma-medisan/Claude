@@ -283,6 +283,27 @@ async function sendRelance({ to, prenom, type, objet, message, residence, date_f
         ${residence ? infoRow('Résidence', residence) : ''}
         ${date_fin ? infoRow('Date limite', `<strong style="color:#ef4444;">${date_fin}</strong>`) : ''}
         ${gestionnaire_nom ? infoRow('Votre gestionnaire', gestionnaire_nom) : ''}
+        ${infoRow('Montant', '<span style="font-size:12px;color:#6b7280;">Le montant indiqué correspond aux cotisations impayées à ce jour uniquement.</span>')}
+      </table>
+    </div>
+
+    <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:20px;margin:20px 0;">
+      <div style="font-size:14px;font-weight:bold;color:#1e3a5f;margin-bottom:12px;">💳 Modalités de règlement</div>
+      <table cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <td style="vertical-align:top;padding-right:20px;width:50%;">
+            <div style="font-size:12px;font-weight:bold;color:#374151;margin-bottom:8px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">Par virement bancaire</div>
+            ${infoRow('Banque', 'CIH BANK')}
+            ${infoRow('Titulaire', 'PROPNEX SARLAU')}
+            ${infoRow('RIB', '<span style="font-family:monospace;font-weight:bold;">230 780 6472792221032000 09</span>')}
+            ${infoRow('SWIFT', '<span style="font-family:monospace;">CIHMMAMC</span>')}
+          </td>
+          <td style="vertical-align:top;width:50%;">
+            <div style="font-size:12px;font-weight:bold;color:#374151;margin-bottom:8px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">Par chèque</div>
+            ${infoRow('À l\'ordre de', '<strong>PROPNEX SARLAU</strong>')}
+            <tr><td colspan="2" style="padding-top:6px;font-size:12px;color:#6b7280;">À remettre au gestionnaire de votre résidence.</td></tr>
+          </td>
+        </tr>
       </table>
     </div>
 

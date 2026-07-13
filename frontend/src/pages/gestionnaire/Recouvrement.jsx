@@ -32,9 +32,9 @@ function generateLettre({ copro, user, type, montant, adresse, gestionnaire }) {
   const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 
   const body = {
-    'Rappel': `Nous avons l'honneur de vous contacter concernant le règlement de vos cotisations de copropriété pour la résidence <strong>${copro}</strong>.\n\nNous vous informons qu'un montant de <strong>${montantStr}</strong> reste à ce jour impayé.\n\nNous vous saurions gré de bien vouloir procéder au règlement de cette somme dans les meilleurs délais. Si vous avez déjà effectué ce paiement, nous vous prions de ne pas tenir compte de ce courrier.\n\nRestant à votre disposition pour tout renseignement complémentaire,`,
-    'Relance': `Malgré notre précédent courrier resté sans suite, nous constatons que votre cotisation d'un montant de <strong>${montantStr}</strong> pour la résidence <strong>${copro}</strong> demeure impayée.\n\nNous vous demandons instamment de procéder au règlement de cette somme dans un délai de <strong>15 jours</strong> à compter de la réception du présent courrier.\n\nPassé ce délai, nous nous verrons dans l'obligation d'engager les démarches nécessaires au recouvrement de cette créance.\n\nNous espérons qu'une telle procédure ne sera pas nécessaire et restons confiants en votre coopération,`,
-    'Mise en demeure': `Par la présente, nous vous mettons en demeure de procéder au règlement de la somme de <strong>${montantStr}</strong> due au titre de vos cotisations de copropriété pour la résidence <strong>${copro}</strong>.\n\nCette mise en demeure formelle vous est adressée conformément à la réglementation en vigueur en matière de copropriété.\n\nVous disposez d'un délai de <strong>8 jours</strong> à compter de la réception du présent courrier pour régulariser votre situation. Passé ce délai, nous nous verrons contraints de saisir les instances compétentes pour obtenir le recouvrement judiciaire de cette créance, et ce à vos frais.\n\nNous vous invitons à prendre contact avec le syndic sans délai,`,
+    'Rappel': `Nous avons l'honneur de vous contacter concernant le règlement de vos cotisations de copropriété pour la résidence ${copro}.\n\nNous vous informons qu'un montant de ${montantStr} reste impayé à ce jour. Ce montant correspond aux cotisations dues à la date du ${today} uniquement.\n\nNous vous saurions gré de bien vouloir procéder au règlement de cette somme dans les meilleurs délais. Si vous avez déjà effectué ce paiement, nous vous prions de ne pas tenir compte de ce courrier.\n\nRestant à votre disposition pour tout renseignement complémentaire,`,
+    'Relance': `Malgré notre précédent courrier resté sans suite, nous constatons que votre cotisation d'un montant de ${montantStr} pour la résidence ${copro} demeure impayée à ce jour. Ce montant correspond aux cotisations dues à la date du ${today} uniquement.\n\nNous vous demandons instamment de procéder au règlement de cette somme dans un délai de 15 jours à compter de la réception du présent courrier.\n\nPassé ce délai, nous nous verrons dans l'obligation d'engager les démarches nécessaires au recouvrement de cette créance.\n\nNous espérons qu'une telle procédure ne sera pas nécessaire et restons confiants en votre coopération,`,
+    'Mise en demeure': `Par la présente, nous vous mettons en demeure de procéder au règlement de la somme de ${montantStr} due au titre de vos cotisations de copropriété pour la résidence ${copro}. Ce montant correspond aux cotisations impayées à la date du ${today} uniquement.\n\nCette mise en demeure formelle vous est adressée conformément à la réglementation en vigueur en matière de copropriété.\n\nVous disposez d'un délai de 8 jours à compter de la réception du présent courrier pour régulariser votre situation. Passé ce délai, nous nous verrons contraints de saisir les instances compétentes pour obtenir le recouvrement judiciaire de cette créance, et ce à vos frais.\n\nNous vous invitons à prendre contact avec le syndic sans délai,`,
   }[type] || '';
 
   const html = `<!DOCTYPE html>
@@ -44,43 +44,50 @@ function generateLettre({ copro, user, type, montant, adresse, gestionnaire }) {
 <title>${typeLabel} — ${user.prenom} ${user.nom}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Times New Roman', serif; font-size: 12pt; color: #1a1a1a; background: white; }
-  .page { max-width: 210mm; margin: 0 auto; padding: 20mm 20mm 20mm 25mm; min-height: 297mm; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; padding-bottom: 16px; border-bottom: 2px solid #1e3a5f; }
-  .logo { font-size: 18pt; font-weight: bold; color: #1e3a5f; }
+  body { font-family: 'Times New Roman', serif; font-size: 11pt; color: #1a1a1a; background: white; }
+  .page { max-width: 210mm; margin: 0 auto; padding: 16mm 20mm 14mm 22mm; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 2px solid #1e3a5f; }
+  .logo { font-size: 16pt; font-weight: bold; color: #1e3a5f; }
   .logo span { color: #3b82f6; }
-  .logo-sub { font-size: 9pt; color: #6b7280; }
-  .sender-block { text-align: right; font-size: 10pt; color: #374151; line-height: 1.6; }
-  .dest-block { margin: 30px 0 24px; padding: 14px 16px; border-left: 4px solid #1e3a5f; background: #f8fafc; font-size: 10.5pt; line-height: 1.7; }
-  .date-lieu { text-align: right; font-size: 10.5pt; color: #374151; margin-bottom: 24px; }
-  .ref { font-size: 9.5pt; color: #6b7280; margin-bottom: 20px; }
-  .type-badge { display: inline-block; padding: 5px 14px; border-radius: 4px; font-size: 10pt; font-weight: bold; letter-spacing: 0.05em; margin-bottom: 20px; }
+  .logo-sub { font-size: 8pt; color: #6b7280; }
+  .sender-block { text-align: right; font-size: 9pt; color: #374151; line-height: 1.5; }
+  .dest-block { margin: 14px 0 12px; padding: 10px 14px; border-left: 4px solid #1e3a5f; background: #f8fafc; font-size: 10pt; line-height: 1.6; }
+  .date-lieu { text-align: right; font-size: 10pt; color: #374151; margin-bottom: 12px; }
+  .ref { font-size: 8.5pt; color: #6b7280; margin-bottom: 10px; }
+  .type-badge { display: inline-block; padding: 3px 12px; border-radius: 4px; font-size: 9.5pt; font-weight: bold; letter-spacing: 0.05em; margin-bottom: 10px; }
   .badge-rappel { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
   .badge-relance { background: #ffedd5; color: #9a3412; border: 1px solid #fed7aa; }
   .badge-mise { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
-  .objet { font-size: 11pt; font-weight: bold; margin-bottom: 20px; }
-  .salut { margin-bottom: 16px; font-size: 11pt; }
-  .body-text { font-size: 11pt; line-height: 1.8; margin-bottom: 24px; white-space: pre-wrap; }
-  .montant-box { border: 1px solid #e5e7eb; border-radius: 6px; padding: 14px 18px; margin: 20px 0; background: #f9fafb; }
-  .montant-label { font-size: 9pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.08em; }
-  .montant-val { font-size: 16pt; font-weight: bold; color: #1e3a5f; }
-  .signature { margin-top: 36px; }
-  .sign-title { font-size: 10.5pt; color: #374151; margin-bottom: 4px; }
-  .sign-name { font-size: 11pt; font-weight: bold; }
-  .sign-role { font-size: 9.5pt; color: #6b7280; }
-  .footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 8.5pt; color: #9ca3af; text-align: center; }
+  .objet { font-size: 10.5pt; font-weight: bold; margin-bottom: 10px; }
+  .salut { margin-bottom: 10px; font-size: 10.5pt; }
+  .body-text { font-size: 10.5pt; line-height: 1.7; margin-bottom: 14px; white-space: pre-wrap; }
+  .montant-box { border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px 16px; margin: 12px 0; background: #f9fafb; display: flex; align-items: center; justify-content: space-between; }
+  .montant-label { font-size: 8.5pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.08em; }
+  .montant-val { font-size: 15pt; font-weight: bold; color: #1e3a5f; }
+  .montant-note { font-size: 7.5pt; color: #9ca3af; margin-top: 2px; }
+  .rib-box { border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px 16px; margin: 10px 0; background: #f0f9ff; }
+  .rib-title { font-size: 9pt; font-weight: bold; color: #1e3a5f; margin-bottom: 8px; }
+  .rib-cols { display: flex; gap: 24px; flex-wrap: wrap; }
+  .rib-section { flex: 1; min-width: 140px; }
+  .rib-section-title { font-size: 8pt; font-weight: bold; color: #374151; margin-bottom: 4px; border-bottom: 1px solid #e2e8f0; padding-bottom: 2px; }
+  .rib-row { display: flex; gap: 6px; font-size: 8.5pt; color: #374151; margin-top: 3px; }
+  .rib-key { color: #6b7280; min-width: 60px; flex-shrink: 0; }
+  .rib-val { font-weight: bold; font-family: 'Courier New', monospace; }
+  .signature { margin-top: 16px; }
+  .sign-title { font-size: 10pt; color: #374151; margin-bottom: 4px; }
+  .sign-name { font-size: 10.5pt; font-weight: bold; }
+  .sign-role { font-size: 9pt; color: #6b7280; }
+  .footer { margin-top: 14px; padding-top: 8px; border-top: 1px solid #e5e7eb; font-size: 8pt; color: #9ca3af; text-align: center; }
+  .print-btn { position: fixed; top: 12px; right: 20px; background: #1e3a5f; color: white; border: none; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; font-family: system-ui, sans-serif; box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 100; }
   @media print {
     body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-    .page { padding: 15mm 20mm; }
-    .no-print { display: none; }
+    .page { padding: 12mm 18mm 12mm 20mm; }
+    .print-btn { display: none; }
   }
 </style>
 </head>
 <body>
-<div class="no-print" style="background:#1e3a5f;color:white;padding:12px 20px;text-align:center;font-family:system-ui,sans-serif;font-size:13px;display:flex;justify-content:space-between;align-items:center;">
-  <span>Lettre prête à imprimer</span>
-  <button onclick="window.print()" style="background:#3b82f6;color:white;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Imprimer / Enregistrer PDF</button>
-</div>
+<button class="print-btn" onclick="window.print()">Imprimer / PDF</button>
 <div class="page">
   <div class="header">
     <div>
@@ -110,11 +117,32 @@ function generateLettre({ copro, user, type, montant, adresse, gestionnaire }) {
 
   <div class="salut">Madame, Monsieur ${user.nom},</div>
 
-  <div class="body-text">${body.replace(/<strong>/g, '').replace(/<\/strong>/g, '')}</div>
+  <div class="body-text">${body}</div>
 
   <div class="montant-box">
-    <div class="montant-label">Montant dû</div>
-    <div class="montant-val">${montantStr}</div>
+    <div>
+      <div class="montant-label">Montant dû à ce jour</div>
+      <div class="montant-val">${montantStr}</div>
+      <div class="montant-note">Cotisations impayées au ${today} uniquement</div>
+    </div>
+  </div>
+
+  <div class="rib-box">
+    <div class="rib-title">Modalités de règlement</div>
+    <div class="rib-cols">
+      <div class="rib-section">
+        <div class="rib-section-title">Par virement bancaire</div>
+        <div class="rib-row"><span class="rib-key">Banque :</span><span class="rib-val">CIH BANK</span></div>
+        <div class="rib-row"><span class="rib-key">Titulaire :</span><span class="rib-val">PROPNEX SARLAU</span></div>
+        <div class="rib-row"><span class="rib-key">RIB :</span><span class="rib-val">230 780 6472792221032000 09</span></div>
+        <div class="rib-row"><span class="rib-key">SWIFT :</span><span class="rib-val">CIHMMAMC</span></div>
+      </div>
+      <div class="rib-section">
+        <div class="rib-section-title">Par chèque</div>
+        <div class="rib-row"><span class="rib-key">À l'ordre de :</span><span class="rib-val">PROPNEX SARLAU</span></div>
+        <div class="rib-row" style="margin-top:6px;font-size:8pt;color:#6b7280;">Remettre le chèque au gestionnaire de votre résidence ou l'envoyer à l'adresse du syndic.</div>
+      </div>
+    </div>
   </div>
 
   <div class="signature">
