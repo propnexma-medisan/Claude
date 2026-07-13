@@ -484,11 +484,18 @@ function NewCotisationModal({ coproprieteId, coproUsers, onClose, onSave }) {
         <div className="p-6 space-y-4 overflow-y-auto">
           {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">{error}</p>}
 
+          {coproUsers.length === 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-700">
+              Tous les copropriétaires ont déjà une cotisation active ou suspendue.
+            </div>
+          )}
+
           {/* Copropriétaire */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Copropriétaire <span className="text-red-500">*</span></label>
             <select value={form.user_id} onChange={(e) => handleUserChange(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={coproUsers.length === 0}>
               <option value="">— Sélectionner —</option>
               {coproUsers.map((u) => (
                 <option key={u.id} value={u.id}>{u.prenom} {u.nom}{u.lot_numero ? ` — Lot ${u.lot_numero}` : ''}</option>
@@ -954,6 +961,14 @@ function Cotisations() {
     }
   }
 
+  // Users who already have an ongoing cotisation (Active or Suspendue)
+  const usersWithActiveCotisation = new Set(
+    list
+      .filter((c) => c.statut === 'Active' || c.statut === 'Suspendue')
+      .map((c) => c.user_id)
+  );
+  const coproUsersAvailable = coproUsers.filter((u) => !usersWithActiveCotisation.has(u.id));
+
   const expirantCount30 = alertes.expirant_bientot.filter((c) => daysRemaining(c.date_fin) <= 30).length;
   const impayes30Count = alertes.impayes.length;
 
@@ -1134,7 +1149,7 @@ function Cotisations() {
       {showNewModal && (
         <NewCotisationModal
           coproprieteId={coproprieteId}
-          coproUsers={coproUsers}
+          coproUsers={coproUsersAvailable}
           onClose={() => setShowNewModal(false)}
           onSave={handleCreate}
         />
