@@ -113,7 +113,14 @@ export const tickets = {
   create: (data) => api.post('/tickets', data),
   update: (id, data) => api.put(`/tickets/${id}`, data),
   getMessages: (id) => api.get(`/tickets/${id}/messages`),
-  addMessage: (id, data) => api.post(`/tickets/${id}/messages`, data),
+  addMessage: (id, formData) => {
+    const token = getToken();
+    return fetch(`${BASE_URL}/tickets/${id}/messages`, {
+      method: 'POST',
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: formData,
+    }).then((r) => r.ok ? r.json() : r.json().then((e) => Promise.reject(new Error(e.error || 'Erreur'))));
+  },
 };
 
 // Messages de diffusion

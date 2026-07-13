@@ -122,7 +122,17 @@ function initializeDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       ticket_id INTEGER NOT NULL REFERENCES tickets(id),
       user_id INTEGER NOT NULL REFERENCES users(id),
-      message TEXT NOT NULL,
+      message TEXT NOT NULL DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS ticket_message_attachments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ticket_message_id INTEGER NOT NULL REFERENCES ticket_messages(id) ON DELETE CASCADE,
+      filename TEXT NOT NULL,
+      original_name TEXT NOT NULL,
+      mimetype TEXT,
+      size INTEGER,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 

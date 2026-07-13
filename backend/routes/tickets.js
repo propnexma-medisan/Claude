@@ -1,4 +1,7 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const db = require('../database');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { sendNouveauTicket, sendReponseTicket, sendTicketCloture } = require('../services/email');
@@ -8,9 +11,37 @@ const APP_URL = process.env.APP_URL || 'https://syndicpro.propnex.ma';
 
 const router = express.Router();
 
+const uploadDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => cb(null, `ticket-${Date.now()}-${file.originalname.replace(/\s+/g, '_')}`),
+});
+const upload = multer({
+  storage,
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ok = file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf';
+    cb(null, ok);
+  },
+});
+
+function attachPJ(messages) {
+  if (!messages.length) return messages;
+  const ids = messages.map((m) => m.id);
+  const pjs = db.prepare(
+    `SELECT * FROM ticket_message_attachments WHERE ticket_message_id IN (${ids.map(() => '?').join(',')}) ORDER BY created_at ASC`
+  ).all(...ids);
+  const byMsg = {};
+  for (const pj of pjs) {
+    if (!byMsg[pj.ticket_message_id]) byMsg[pj.ticket_message_id] = [];
+    byMsg[pj.ticket_message_id].push({ ...pj, url: `/api/uploads/${pj.filename}` });
+  }
+  return messages.map((m) => ({ ...m, attachments: byMsg[m.id] || [] }));
+}
+
 // GET /api/tickets
-// gestionnaire: tickets of their residence(s)
-// copropriétaire: own tickets
 router.get('/', authenticate, (req, res) => {
   try {
     let tickets;
@@ -55,7 +86,6 @@ router.get('/', authenticate, (req, res) => {
         `).all(req.user.id);
       }
     } else {
-      // copropietaire
       tickets = db.prepare(`
         SELECT t.*, u.nom as createur_nom, u.prenom as createur_prenom,
                c.nom as copropriete_nom, l.numero as lot_numero
@@ -94,15 +124,7 @@ router.post('/', authenticate, (req, res) => {
     const result = db.prepare(`
       INSERT INTO tickets (copropriete_id, lot_id, createur_id, titre, description, categorie, priorite)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      copropriete_id,
-      lot_id || null,
-      createur_id,
-      titre,
-      description,
-      categorie || 'Général',
-      priorite || 'Normale'
-    );
+    `).run(copropriete_id, lot_id || null, createur_id, titre, description, categorie || 'Général', priorite || 'Normale');
 
     const ticket = db.prepare(`
       SELECT t.*, u.nom as createur_nom, u.prenom as createur_prenom,
@@ -113,7 +135,6 @@ router.post('/', authenticate, (req, res) => {
       WHERE t.id = ?
     `).get(result.lastInsertRowid);
 
-    // Notify gestionnaire of the residence (non-blocking)
     const gestionnaire = db.prepare(`
       SELECT id, nom, prenom, email FROM users
       WHERE role = 'gestionnaire' AND copropriete_id = ?
@@ -147,21 +168,16 @@ router.put('/:id', authenticate, requireRole('gestionnaire', 'admin'), (req, res
     const existing = db.prepare('SELECT * FROM tickets WHERE id = ?').get(id);
     if (!existing) return res.status(404).json({ error: 'Ticket non trouvé' });
 
-    // Gestionnaire can only update tickets in their residences
     if (req.user.role === 'gestionnaire' && !canGestionnaireAccessResidence(req.user.id, existing.copropriete_id)) {
       return res.status(403).json({ error: 'Accès refusé à ce ticket' });
     }
 
     const { statut, priorite } = req.body;
+    const newStatut = statut || existing.statut;
 
     db.prepare(`
-      UPDATE tickets SET statut = ?, priorite = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(
-      statut || existing.statut,
-      priorite || existing.priorite,
-      id
-    );
+      UPDATE tickets SET statut = ?, priorite = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+    `).run(newStatut, priorite || existing.priorite, id);
 
     const updated = db.prepare(`
       SELECT t.*, u.nom as createur_nom, u.prenom as createur_prenom,
@@ -172,20 +188,32 @@ router.put('/:id', authenticate, requireRole('gestionnaire', 'admin'), (req, res
       WHERE t.id = ?
     `).get(id);
 
+    // Send email when status changes to Résolu or Fermé (only if status actually changed)
+    if (statut && statut !== existing.statut && (statut === 'Résolu' || statut === 'Fermé')) {
+      const createur = db.prepare('SELECT id, nom, prenom, email FROM users WHERE id = ?').get(existing.createur_id);
+      if (createur) {
+        sendTicketCloture({
+          to: createur.email,
+          prenom: createur.prenom,
+          titre: existing.titre,
+          resolution: `Votre ticket a été marqué comme "${statut}" par votre gestionnaire.`,
+        }).catch(console.error);
+      }
+    }
+
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET /api/tickets/:id/messages — get thread
+// GET /api/tickets/:id/messages — get thread with attachments
 router.get('/:id/messages', authenticate, (req, res) => {
   try {
     const { id } = req.params;
     const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(id);
     if (!ticket) return res.status(404).json({ error: 'Ticket non trouvé' });
 
-    // Access control
     if (req.user.role === 'copropietaire' && ticket.createur_id !== req.user.id) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
@@ -201,24 +229,26 @@ router.get('/:id/messages', authenticate, (req, res) => {
       ORDER BY tm.created_at ASC
     `).all(id);
 
-    res.json(messages);
+    res.json(attachPJ(messages));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// POST /api/tickets/:id/messages — add message (gestionnaire or ticket owner)
-router.post('/:id/messages', authenticate, (req, res) => {
+// POST /api/tickets/:id/messages — add message with optional file attachments
+router.post('/:id/messages', authenticate, upload.array('attachments', 5), (req, res) => {
   try {
     const { id } = req.params;
-    const { message } = req.body;
+    const message = (req.body.message || '').trim();
+    const files = req.files || [];
 
-    if (!message) return res.status(400).json({ error: 'message est requis' });
+    if (!message && files.length === 0) {
+      return res.status(400).json({ error: 'Un message ou une pièce jointe est requis' });
+    }
 
     const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(id);
     if (!ticket) return res.status(404).json({ error: 'Ticket non trouvé' });
 
-    // Access control
     if (req.user.role === 'copropietaire' && ticket.createur_id !== req.user.id) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
@@ -227,11 +257,19 @@ router.post('/:id/messages', authenticate, (req, res) => {
     }
 
     const result = db.prepare(`
-      INSERT INTO ticket_messages (ticket_id, user_id, message)
-      VALUES (?, ?, ?)
+      INSERT INTO ticket_messages (ticket_id, user_id, message) VALUES (?, ?, ?)
     `).run(id, req.user.id, message);
 
-    // Update ticket updated_at
+    const msgId = result.lastInsertRowid;
+
+    // Store attachments
+    for (const file of files) {
+      db.prepare(`
+        INSERT INTO ticket_message_attachments (ticket_message_id, filename, original_name, mimetype, size)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(msgId, file.filename, file.originalname, file.mimetype, file.size);
+    }
+
     db.prepare('UPDATE tickets SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
 
     const msg = db.prepare(`
@@ -239,14 +277,21 @@ router.post('/:id/messages', authenticate, (req, res) => {
       FROM ticket_messages tm
       JOIN users u ON tm.user_id = u.id
       WHERE tm.id = ?
-    `).get(result.lastInsertRowid);
+    `).get(msgId);
 
-    // Email notifications for ticket messages (non-blocking)
-    const { statut: nouveauStatut } = req.body;
+    msg.attachments = files.map((f) => ({
+      filename: f.filename,
+      original_name: f.originalname,
+      mimetype: f.mimetype,
+      size: f.size,
+      url: `/api/uploads/${f.filename}`,
+    }));
+
+    // Email notifications
+    const { nouveauStatut } = req.body;
     const isResolved = nouveauStatut === 'Résolu' || nouveauStatut === 'Fermé';
 
     if (req.user.role === 'gestionnaire' || req.user.role === 'admin') {
-      // Gestionnaire replied → notify ticket creator (copropriétaire)
       const createur = db.prepare('SELECT id, nom, prenom, email FROM users WHERE id = ?').get(ticket.createur_id);
       if (createur) {
         if (isResolved) {
@@ -254,14 +299,14 @@ router.post('/:id/messages', authenticate, (req, res) => {
             to: createur.email,
             prenom: createur.prenom,
             titre: ticket.titre,
-            resolution: message,
+            resolution: message || `Ticket clôturé avec ${files.length} pièce(s) jointe(s)`,
           }).catch(console.error);
         } else {
           sendReponseTicket({
             to: createur.email,
             prenom: createur.prenom,
             titre: ticket.titre,
-            reponse: message,
+            reponse: message || `Le gestionnaire a joint ${files.length} fichier(s) à votre ticket.`,
             auteur_reponse: `${req.user.prenom} ${req.user.nom}`,
             statut: nouveauStatut || ticket.statut,
             lien: `${APP_URL}/tickets/${ticket.id}`,
@@ -269,7 +314,6 @@ router.post('/:id/messages', authenticate, (req, res) => {
         }
       }
     } else {
-      // Copropriétaire replied → notify gestionnaire
       const gestionnaire = db.prepare(`
         SELECT id, nom, prenom, email FROM users
         WHERE role = 'gestionnaire' AND copropriete_id = ?
@@ -280,7 +324,7 @@ router.post('/:id/messages', authenticate, (req, res) => {
           to: gestionnaire.email,
           prenom: gestionnaire.prenom,
           titre: ticket.titre,
-          reponse: message,
+          reponse: message || `Le copropriétaire a joint ${files.length} fichier(s).`,
           auteur_reponse: `${req.user.prenom} ${req.user.nom}`,
           statut: nouveauStatut || ticket.statut,
           lien: `${APP_URL}/tickets/${ticket.id}`,
