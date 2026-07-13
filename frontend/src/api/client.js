@@ -104,6 +104,7 @@ export const users = {
   update: (id, data) => api.put(`/users/${id}`, data),
   delete: (id) => api.delete(`/users/${id}`),
   byResidence: (coproprieteId) => api.get(`/users/by-residence/${coproprieteId}`),
+  resendCredentials: (id) => api.post(`/users/${id}/resend-credentials`, {}),
 };
 
 // Tickets

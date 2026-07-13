@@ -21,6 +21,7 @@ function Copropietaires() {
   const [editId, setEditId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [resendingId, setResendingId] = useState(null);
 
   const load = () => {
     if (!selectedCoproId) { setLoading(false); return; }
@@ -73,6 +74,19 @@ function Copropietaires() {
       setError(err.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const resendCredentials = async (u) => {
+    if (!confirm(`Générer un nouveau mot de passe et renvoyer les identifiants à ${u.prenom} ${u.nom} (${u.email}) ?`)) return;
+    setResendingId(u.id);
+    try {
+      await users.resendCredentials(u.id);
+      alert(`Identifiants renvoyés à ${u.email}`);
+    } catch (err) {
+      alert(`Erreur : ${err.message}`);
+    } finally {
+      setResendingId(null);
     }
   };
 
@@ -195,8 +209,16 @@ function Copropietaires() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <button onClick={() => openEdit(u)} className="text-blue-500 hover:text-blue-700 text-xs font-medium">Modifier</button>
+                      <button
+                        onClick={() => resendCredentials(u)}
+                        disabled={resendingId === u.id}
+                        title="Renvoyer les identifiants de connexion par email"
+                        className="text-amber-500 hover:text-amber-700 text-xs font-medium disabled:opacity-50"
+                      >
+                        {resendingId === u.id ? 'Envoi...' : 'Renvoyer identifiants'}
+                      </button>
                       <button onClick={() => del(u.id)} className="text-red-400 hover:text-red-600 text-xs font-medium">Supprimer</button>
                     </div>
                   </td>

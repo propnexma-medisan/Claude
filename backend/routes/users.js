@@ -233,6 +233,46 @@ router.put('/:id', authenticate, async (req, res) => {
   }
 });
 
+// POST /api/users/:id/resend-credentials — generate new temp password and resend welcome email
+router.post('/:id/resend-credentials', authenticate, requireRole('gestionnaire', 'admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = db.prepare(`
+      SELECT u.*, c.nom as copropriete_nom
+      FROM users u LEFT JOIN coproprietes c ON u.copropriete_id = c.id
+      WHERE u.id = ?
+    `).get(id);
+    if (!existing) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+
+    if (req.user.role === 'gestionnaire') {
+      if (existing.role !== 'copropietaire' || !canGestionnaireAccessResidence(req.user.id, existing.copropriete_id)) {
+        return res.status(403).json({ error: 'Accès refusé' });
+      }
+    }
+
+    // Generate a new 8-char temp password
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    const tempPassword = Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    const password_hash = await bcrypt.hash(tempPassword, 10);
+
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(password_hash, id);
+
+    await sendBienvenue({
+      to: existing.email,
+      prenom: existing.prenom,
+      nom: existing.nom,
+      email: existing.email,
+      password: tempPassword,
+      role: existing.role,
+      residence: existing.copropriete_nom || null,
+    });
+
+    res.json({ message: 'Identifiants renvoyés avec succès' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // DELETE /api/users/:id — admin or gestionnaire (gestionnaire can only delete copropietaires in their residence)
 router.delete('/:id', authenticate, (req, res) => {
   try {
