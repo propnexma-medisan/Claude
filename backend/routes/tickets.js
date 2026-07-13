@@ -152,8 +152,9 @@ router.post('/', authenticate, upload.array('attachments', 5), (req, res) => {
     }
 
     const gestionnaire = db.prepare(`
-      SELECT id, nom, prenom, email FROM users
-      WHERE role = 'gestionnaire' AND copropriete_id = ?
+      SELECT u.id, u.nom, u.prenom, u.email FROM users u
+      JOIN gestionnaire_residences gr ON gr.gestionnaire_id = u.id
+      WHERE u.role = 'gestionnaire' AND gr.copropriete_id = ?
       LIMIT 1
     `).get(copropriete_id);
 
@@ -343,8 +344,9 @@ router.post('/:id/messages', authenticate, upload.array('attachments', 5), (req,
       }
     } else {
       const gestionnaire = db.prepare(`
-        SELECT id, nom, prenom, email FROM users
-        WHERE role = 'gestionnaire' AND copropriete_id = ?
+        SELECT u.id, u.nom, u.prenom, u.email FROM users u
+        JOIN gestionnaire_residences gr ON gr.gestionnaire_id = u.id
+        WHERE u.role = 'gestionnaire' AND gr.copropriete_id = ?
         LIMIT 1
       `).get(ticket.copropriete_id);
       if (gestionnaire) {
