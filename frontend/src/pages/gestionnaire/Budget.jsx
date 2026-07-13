@@ -22,6 +22,18 @@ const CATEGORIES_BUDGET = [
 const MONTHS_KEYS = ['jan', 'fev', 'mar', 'avr', 'mai', 'jun', 'jul', 'aou', 'sep', 'oct', 'nov', 'dec'];
 const MONTHS_LABELS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
 
+const RECURRING_PRESETS = [
+  { libelle: 'Honoraires syndic', categorie: 'Honoraires syndic' },
+  { libelle: 'Salaire gardiennage', categorie: 'Sécurité' },
+  { libelle: 'Salaire nettoyage', categorie: 'Ménage / Nettoyage' },
+  { libelle: 'Entretien espaces verts', categorie: 'Jardinage / Espaces verts' },
+  { libelle: 'Électricité parties communes', categorie: 'Électricité parties communes' },
+  { libelle: 'Eau / Plomberie', categorie: 'Eau / Plomberie' },
+  { libelle: 'Assurance immeuble', categorie: 'Assurance immeuble' },
+  { libelle: 'Contrat ascenseur', categorie: 'Contrats ascenseur' },
+  { libelle: 'Ordures ménagères', categorie: 'Ordures ménagères' },
+];
+
 const BASE_URL = import.meta.env.PROD ? '' : 'http://localhost:3001';
 
 function fmt(n) {
@@ -470,6 +482,22 @@ function TabDepenses({ coproprieteId }) {
     }
   };
 
+  const quickCreate = (preset) => {
+    const today = new Date().toISOString().split('T')[0];
+    setEditingDepense({
+      categorie: preset.categorie,
+      libelle: preset.libelle,
+      montant: '',
+      date_depense: today,
+      budget_id: '',
+      fournisseur_id: '',
+      numero_facture: '',
+      notes: '',
+      justificatif_url: '',
+    });
+    setShowModal(true);
+  };
+
   const duplicateDepense = (d) => {
     const today = new Date().toISOString().split('T')[0];
     setEditingDepense({
@@ -493,6 +521,25 @@ function TabDepenses({ coproprieteId }) {
 
   return (
     <div>
+      {/* Quick-create recurring expenses */}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-5">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Saisie rapide — dépenses courantes</p>
+        <div className="flex flex-wrap gap-2">
+          {RECURRING_PRESETS.map((p) => (
+            <button
+              key={p.libelle}
+              onClick={() => quickCreate(p)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-300 bg-white text-sm text-gray-700 hover:border-blue-400 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+              </svg>
+              {p.libelle}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3 mb-5">
         <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={filterAnnee} onChange={e => setFilterAnnee(e.target.value)}>
@@ -626,7 +673,7 @@ function TabDepenses({ coproprieteId }) {
 }
 
 function DepenseModal({ depense, coproprieteId, budgetsList, onClose, onSaved }) {
-  const isEdit = !!depense;
+  const isEdit = !!depense?.id;
   const today = new Date().toISOString().split('T')[0];
 
   const [form, setForm] = useState({
