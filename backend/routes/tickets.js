@@ -188,16 +188,28 @@ router.put('/:id', authenticate, requireRole('gestionnaire', 'admin'), (req, res
       WHERE t.id = ?
     `).get(id);
 
-    // Send email when status changes to Résolu or Fermé (only if status actually changed)
-    if (statut && statut !== existing.statut && (statut === 'Résolu' || statut === 'Fermé')) {
+    // Send email on any status change (only if status actually changed)
+    if (statut && statut !== existing.statut) {
       const createur = db.prepare('SELECT id, nom, prenom, email FROM users WHERE id = ?').get(existing.createur_id);
       if (createur) {
-        sendTicketCloture({
-          to: createur.email,
-          prenom: createur.prenom,
-          titre: existing.titre,
-          resolution: `Votre ticket a été marqué comme "${statut}" par votre gestionnaire.`,
-        }).catch(console.error);
+        if (statut === 'Résolu' || statut === 'Fermé') {
+          sendTicketCloture({
+            to: createur.email,
+            prenom: createur.prenom,
+            titre: existing.titre,
+            resolution: `Votre ticket a été marqué comme "${statut}" par votre gestionnaire.`,
+          }).catch(console.error);
+        } else {
+          sendReponseTicket({
+            to: createur.email,
+            prenom: createur.prenom,
+            titre: existing.titre,
+            reponse: `Le statut de votre ticket a été mis à jour : ${existing.statut} → ${statut}.`,
+            auteur_reponse: `${req.user.prenom} ${req.user.nom}`,
+            statut,
+            lien: `${APP_URL}/tickets/${existing.id}`,
+          }).catch(console.error);
+        }
       }
     }
 
