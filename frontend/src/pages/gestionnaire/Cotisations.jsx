@@ -901,6 +901,7 @@ function Cotisations() {
   const [selectedId, setSelectedId] = useState(null);
   const [showDetail, setShowDetail] = useState(false);
   const [filter, setFilter] = useState('Tous');
+  const [search, setSearch] = useState('');
   const [showNewModal, setShowNewModal] = useState(false);
   const [error, setError] = useState('');
 
@@ -957,11 +958,18 @@ function Cotisations() {
   const impayes30Count = alertes.impayes.length;
 
   const filtered = list.filter((c) => {
-    if (filter === 'Actives') return c.statut === 'Active';
-    if (filter === 'Expirées') return c.statut === 'Expirée';
-    if (filter === 'Alertes') {
+    if (filter === 'Actives') { if (c.statut !== 'Active') return false; }
+    else if (filter === 'Expirées') { if (c.statut !== 'Expirée') return false; }
+    else if (filter === 'Alertes') {
       const days = daysRemaining(c.date_fin);
-      return (c.statut === 'Active' && days <= 60) || c.statut === 'Expirée' || c.dernier_paiement_statut === 'En retard';
+      if (!((c.statut === 'Active' && days <= 60) || c.statut === 'Expirée' || c.dernier_paiement_statut === 'En retard')) return false;
+    }
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      const nom = (c.nom || '').toLowerCase();
+      const prenom = (c.prenom || '').toLowerCase();
+      const lot = (c.lot_numero || '').toLowerCase();
+      if (!nom.includes(q) && !prenom.includes(q) && !lot.includes(q) && !(prenom + ' ' + nom).includes(q)) return false;
     }
     return true;
   });
@@ -1025,13 +1033,33 @@ function Cotisations() {
               </div>
             </div>
             {/* Filters */}
-            <div className="flex gap-1">
+            <div className="flex gap-1 mb-2">
               {['Tous', 'Actives', 'Expirées', 'Alertes'].map((f) => (
                 <button key={f} onClick={() => setFilter(f)}
                   className={`text-xs px-2.5 py-1 rounded-full transition-colors ${filter === f ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                   {f}
                 </button>
               ))}
+            </div>
+            {/* Search */}
+            <div className="relative">
+              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z" />
+              </svg>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Nom, prénom ou lot…"
+                className="w-full pl-7 pr-7 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+              />
+              {search && (
+                <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
             </div>
           </div>
 
