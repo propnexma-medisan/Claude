@@ -1,231 +1,291 @@
 import { formatMAD } from '../../utils/currency';
 import React, { useEffect, useState } from 'react';
-import Modal from '../../components/Modal';
 import { useAuth } from '../../contexts/AuthContext';
-import { finances, depenses as depensesApi } from '../../api/client';
+import { finances } from '../../api/client';
 
 function fmt(n) { return formatMAD(n || 0); }
-function fmtDate(d) {
-  if (!d) return '—';
-  return new Date(d + (d.length === 10 ? 'T00:00:00' : '')).toLocaleDateString('fr-FR');
+
+const MONTHS_SHORT = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
+
+function buildMonthlyData(recettes_par_mois, depenses_par_mois, annee) {
+  const rec = {};
+  const dep = {};
+  (recettes_par_mois || []).forEach((r) => { rec[r.mois] = r.recettes; });
+  (depenses_par_mois || []).forEach((d) => { dep[d.mois] = d.depenses; });
+  return MONTHS_SHORT.map((label, i) => {
+    const mois = `${annee}-${String(i + 1).padStart(2, '0')}`;
+    return { label, recettes: rec[mois] || 0, depenses: dep[mois] || 0 };
+  });
 }
 
-const STATUT_COTISATION = {
-  Active: 'bg-green-100 text-green-700',
-  Expirée: 'bg-red-100 text-red-700',
-  Suspendue: 'bg-yellow-100 text-yellow-700',
-  Résiliée: 'bg-gray-100 text-gray-600',
-};
+function BarChart({ data }) {
+  const maxVal = Math.max(...data.flatMap((d) => [d.recettes, d.depenses]), 1);
+  const VW = 620;
+  const VH = 180;
+  const PAD = { top: 12, bottom: 28, left: 52, right: 8 };
+  const chartH = VH - PAD.top - PAD.bottom;
+  const chartW = VW - PAD.left - PAD.right;
+  const groupW = chartW / 12;
+  const barW = Math.min(groupW * 0.35, 18);
+  const yTicks = 4;
 
-const BASE_URL = import.meta.env.PROD ? '' : 'http://localhost:3001';
+  return (
+    <svg viewBox={`0 0 ${VW} ${VH}`} className="w-full" style={{ height: VH }}>
+      {Array.from({ length: yTicks + 1 }, (_, i) => {
+        const val = (maxVal / yTicks) * i;
+        const y = PAD.top + chartH - (val / maxVal) * chartH;
+        return (
+          <g key={i}>
+            <line x1={PAD.left} y1={y} x2={VW - PAD.right} y2={y} stroke="#f3f4f6" strokeWidth="1" />
+            <text x={PAD.left - 6} y={y + 3.5} textAnchor="end" fontSize="9.5" fill="#9ca3af" fontFamily="system-ui,sans-serif">
+              {val >= 1000 ? `${Math.round(val / 1000)}k` : Math.round(val)}
+            </text>
+          </g>
+        );
+      })}
+      {data.map((d, i) => {
+        const cx = PAD.left + (i + 0.5) * groupW;
+        const rh = Math.max((d.recettes / maxVal) * chartH, d.recettes > 0 ? 2 : 0);
+        const dh = Math.max((d.depenses / maxVal) * chartH, d.depenses > 0 ? 2 : 0);
+        return (
+          <g key={i}>
+            <rect x={cx - barW - 2} y={PAD.top + chartH - rh} width={barW} height={rh} fill="#3b82f6" rx="2" opacity="0.85" />
+            <rect x={cx + 2} y={PAD.top + chartH - dh} width={barW} height={dh} fill="#f97316" rx="2" opacity="0.85" />
+            <text x={cx} y={VH - PAD.bottom + 14} textAnchor="middle" fontSize="9.5" fill="#6b7280" fontFamily="system-ui,sans-serif">
+              {d.label}
+            </text>
+          </g>
+        );
+      })}
+      <line x1={PAD.left} y1={PAD.top} x2={PAD.left} y2={PAD.top + chartH} stroke="#e5e7eb" strokeWidth="1" />
+      <line x1={PAD.left} y1={PAD.top + chartH} x2={VW - PAD.right} y2={PAD.top + chartH} stroke="#e5e7eb" strokeWidth="1" />
+    </svg>
+  );
+}
 
-const emptyDepenseForm = {
-  categorie: 'Entretien',
-  libelle: '',
-  montant: '',
-  date_depense: '',
-  fournisseur: '',
-  numero_facture: '',
-  notes: '',
-  justificatif_url: '',
-};
-
-const CATEGORIES = ['Entretien', 'Réparation', 'Nettoyage', 'Sécurité', 'Assurance', 'Honoraires', 'Eau', 'Électricité', 'Ascenseur', 'Espaces verts', 'Autre'];
+function KpiCard({ icon, label, value, color, sub }) {
+  return (
+    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+      <div className="flex items-center gap-2 mb-2">
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${color.bg}`}>
+          {icon}
+        </div>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide leading-tight">{label}</p>
+      </div>
+      <p className={`text-xl font-bold ${color.text}`}>{value}</p>
+      {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+    </div>
+  );
+}
 
 function Finances() {
   const { user, selectedCoproId } = useAuth();
+  const currentYear = new Date().getFullYear();
+  const [annee, setAnnee] = useState(currentYear);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showDepenseForm, setShowDepenseForm] = useState(false);
-  const [depenseForm, setDepenseForm] = useState(emptyDepenseForm);
-  const [editDepenseId, setEditDepenseId] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [formError, setFormError] = useState(null);
-  const [activeTab, setActiveTab] = useState('cotisations');
 
-  const load = () => {
+  useEffect(() => {
     if (!selectedCoproId) { setLoading(false); return; }
-    finances.getByResidence(selectedCoproId)
+    setLoading(true);
+    setError(null);
+    finances.getByResidence(selectedCoproId, annee)
       .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  };
+  }, [selectedCoproId, annee]);
 
-  useEffect(() => { load(); }, [selectedCoproId]);
+  const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
-  const openNewDepense = () => {
-    setDepenseForm({ ...emptyDepenseForm, date_depense: new Date().toISOString().slice(0, 10) });
-    setEditDepenseId(null);
-    setShowDepenseForm(true);
-    setFormError(null);
-  };
-
-  const uploadJustificatif = async (file) => {
-    setUploading(true);
-    try {
-      const token = localStorage.getItem('syndic_token');
-      const fd = new FormData();
-      fd.append('file', file);
-      const res = await fetch(`${BASE_URL}/api/upload`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd });
-      const data = await res.json();
-      if (data.url) setDepenseForm((f) => ({ ...f, justificatif_url: data.url }));
-    } catch { } finally { setUploading(false); }
-  };
-
-  const openEditDepense = (d) => {
-    setDepenseForm({
-      categorie: d.categorie,
-      libelle: d.libelle,
-      montant: d.montant,
-      date_depense: d.date_depense,
-      fournisseur: d.fournisseur || '',
-      numero_facture: d.numero_facture || '',
-      notes: d.notes || '',
-      justificatif_url: d.justificatif_url || '',
-    });
-    setEditDepenseId(d.id);
-    setShowDepenseForm(true);
-    setFormError(null);
-  };
-
-  const saveDepense = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    setFormError(null);
-    try {
-      const payload = { ...depenseForm, copropriete_id: selectedCoproId, montant: parseFloat(depenseForm.montant) };
-      if (editDepenseId) {
-        await depensesApi.update(editDepenseId, payload);
-      } else {
-        await depensesApi.create(payload);
-      }
-      setShowDepenseForm(false);
-      setLoading(true);
-      load();
-    } catch (err) {
-      setFormError(err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const delDepense = async (id) => {
-    if (!confirm('Supprimer cette dépense ?')) return;
-    try {
-      await depensesApi.delete(id);
-      setLoading(true);
-      load();
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-  if (!user?.copropriete_id) {
-    return <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-yellow-700">Aucune résidence assignée.</div>;
+  if (!selectedCoproId && !user?.copropriete_id) {
+    return (
+      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-yellow-700 text-sm">
+        Aucune résidence assignée.
+      </div>
+    );
   }
+
   if (loading) {
-    return <div className="flex justify-center py-12"><div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" /></div>;
-  }
-  if (error) {
-    return <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700">Erreur : {error}</div>;
+    return (
+      <div className="flex justify-center py-16">
+        <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" />
+      </div>
+    );
   }
 
-  const cotisationsList = data?.cotisations_list || [];
-  const depensesList = data?.depenses_list || [];
-  const tauxCot = data?.total_cot_attendu > 0
-    ? Math.round((data.total_cot_paye / data.total_cot_attendu) * 100)
-    : 0;
+  if (error) {
+    return <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">Erreur : {error}</div>;
+  }
+
+  const recettes = data?.total_cot_paye || 0;
+  const depenses = data?.total_depenses_realisees || 0;
+  const impaye = data?.total_cot_impaye || 0;
+  const solde = recettes - depenses;
+  const attendu = data?.total_cot_attendu || 0;
+  const taux = attendu > 0 ? Math.round((recettes / attendu) * 100) : 0;
+
+  const monthlyData = buildMonthlyData(data?.recettes_par_mois, data?.depenses_par_mois, annee);
+  const categories = data?.depenses_par_categorie || [];
+  const topCatMax = categories[0]?.total || 1;
+  const topImpayeurs = data?.top_impayeurs || [];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-800">Finances</h1>
-        <p className="text-sm text-gray-500 mt-1">{data?.copropriete?.nom}</p>
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Tableau de bord financier</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{data?.copropriete?.nom}</p>
+        </div>
+        <select
+          value={annee}
+          onChange={(e) => setAnnee(Number(e.target.value))}
+          className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm"
+        >
+          {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
       </div>
 
-      {/* Summary cards */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-          <p className="text-xs text-gray-500 font-medium uppercase">Cotisations attendues</p>
-          <p className="mt-1 text-xl font-bold text-gray-800">{fmt(data?.total_cot_attendu)}</p>
+        <KpiCard
+          label={`Recettes ${annee}`}
+          value={fmt(recettes)}
+          sub="Cotisations encaissées"
+          color={{ bg: 'bg-blue-50', text: 'text-blue-600' }}
+          icon={
+            <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          }
+        />
+        <KpiCard
+          label={`Dépenses ${annee}`}
+          value={fmt(depenses)}
+          sub="Charges réalisées"
+          color={{ bg: 'bg-orange-50', text: 'text-orange-500' }}
+          icon={
+            <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+            </svg>
+          }
+        />
+        <KpiCard
+          label="Solde net"
+          value={fmt(solde)}
+          sub="Recettes − Dépenses"
+          color={{ bg: solde >= 0 ? 'bg-green-50' : 'bg-red-50', text: solde >= 0 ? 'text-green-600' : 'text-red-600' }}
+          icon={
+            <svg className={`w-4 h-4 ${solde >= 0 ? 'text-green-600' : 'text-red-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d={solde >= 0 ? 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' : 'M13 17h8m0 0V9m0 8l-8-8-4 4-6-6'} />
+            </svg>
+          }
+        />
+        <KpiCard
+          label="Impayés"
+          value={fmt(impaye)}
+          sub="Cotisations en retard"
+          color={{ bg: 'bg-red-50', text: 'text-red-500' }}
+          icon={
+            <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          }
+        />
+      </div>
+
+      {/* Chart + Categories */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-gray-700">Recettes vs Dépenses — {annee}</h2>
+            <div className="flex items-center gap-4 text-xs text-gray-500">
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-2.5 rounded-sm bg-blue-500 inline-block opacity-85" />
+                Recettes
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-2.5 rounded-sm bg-orange-500 inline-block opacity-85" />
+                Dépenses
+              </span>
+            </div>
+          </div>
+          <BarChart data={monthlyData} />
         </div>
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-          <p className="text-xs text-gray-500 font-medium uppercase">Cotisations collectées</p>
-          <p className="mt-1 text-xl font-bold text-green-600">{fmt(data?.total_cot_paye)}</p>
-        </div>
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-          <p className="text-xs text-gray-500 font-medium uppercase">Cotisations impayées</p>
-          <p className="mt-1 text-xl font-bold text-red-600">{fmt(data?.total_cot_impaye)}</p>
-        </div>
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-          <p className="text-xs text-gray-500 font-medium uppercase">Dépenses réalisées</p>
-          <p className="mt-1 text-xl font-bold text-orange-600">{fmt(data?.total_depenses_realisees)}</p>
+
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+          <h2 className="text-sm font-semibold text-gray-700 mb-4">Dépenses par catégorie</h2>
+          {categories.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-10">Aucune dépense enregistrée</p>
+          ) : (
+            <div className="space-y-3.5">
+              {categories.slice(0, 8).map((cat) => (
+                <div key={cat.categorie}>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs text-gray-600 truncate max-w-[140px]">{cat.categorie || 'Autre'}</span>
+                    <span className="text-xs font-semibold text-gray-700 tabular-nums ml-2 flex-shrink-0">{fmt(cat.total)}</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-orange-400"
+                      style={{ width: `${Math.round((cat.total / topCatMax) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Taux de recouvrement */}
       <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-        <div className="flex justify-between items-center mb-2">
-          <p className="text-sm font-medium text-gray-700">Taux de recouvrement des cotisations</p>
-          <p className="text-lg font-bold text-gray-800">{tauxCot}%</p>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-sm font-semibold text-gray-700">Taux de recouvrement</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Cotisations encaissées ({fmt(recettes)}) sur cotisations dues à ce jour ({fmt(attendu)})
+            </p>
+          </div>
+          <p className="text-2xl font-bold text-gray-800">{taux}%</p>
         </div>
-        <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-          <div className="h-full rounded-full transition-all"
-            style={{ width: `${tauxCot}%`, backgroundColor: tauxCot >= 80 ? '#22c55e' : tauxCot >= 50 ? '#f59e0b' : '#ef4444' }} />
+        <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all"
+            style={{
+              width: `${taux}%`,
+              backgroundColor: taux >= 80 ? '#22c55e' : taux >= 50 ? '#f59e0b' : '#ef4444',
+            }}
+          />
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-gray-200">
-        {[
-          { key: 'cotisations', label: `Cotisations (${cotisationsList.length})` },
-          { key: 'depenses', label: `Dépenses réalisées (${depensesList.length})` },
-        ].map((t) => (
-          <button key={t.key} onClick={() => setActiveTab(t.key)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === t.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Cotisations tab */}
-      {activeTab === 'cotisations' && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+      {/* Top impayeurs */}
+      {topImpayeurs.length > 0 && (
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+          <h2 className="text-sm font-semibold text-gray-700 mb-4">Top impayeurs</h2>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[600px]">
-              <thead className="bg-gray-50">
-                <tr>
-                  {['Copropriétaire', 'Lot', 'Période', 'Mensuel', 'Collecté', 'Impayé', 'Statut'].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{h}</th>
+            <table className="w-full text-sm min-w-[400px]">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  {['Copropriétaire', 'Lot', 'Mois impayés', 'Montant dû'].map((h) => (
+                    <th key={h} className={`pb-2 text-xs font-medium text-gray-400 uppercase ${h === 'Montant dû' ? 'text-right' : 'text-left'}`}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {cotisationsList.length === 0 && (
-                  <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Aucune cotisation</td></tr>
-                )}
-                {cotisationsList.map((c) => (
-                  <tr key={c.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-gray-800">{c.prenom} {c.nom}</p>
-                      <p className="text-xs text-gray-400">{c.email}</p>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 text-xs">
-                      {c.lot_numero ? `${c.lot_numero} (${c.lot_type})` : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">
-                      {fmtDate(c.date_debut)} → {fmtDate(c.date_fin)}
-                    </td>
-                    <td className="px-4 py-3 text-gray-700 font-medium">{fmt(c.montant_mensuel)}</td>
-                    <td className="px-4 py-3 text-green-600 font-medium">{fmt(c.cot_paye)}</td>
-                    <td className="px-4 py-3 text-red-500">{fmt(c.cot_impaye)}</td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUT_COTISATION[c.statut] || 'bg-gray-100 text-gray-600'}`}>
-                        {c.statut}
+                {topImpayeurs.map((u, i) => (
+                  <tr key={i} className="hover:bg-gray-50">
+                    <td className="py-2.5 font-medium text-gray-800">{u.prenom} {u.nom}</td>
+                    <td className="py-2.5 text-gray-500 text-xs">{u.lot_numero || '—'}</td>
+                    <td className="py-2.5">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600">
+                        {u.nb_mois} mois
                       </span>
                     </td>
+                    <td className="py-2.5 text-right font-bold text-red-600 tabular-nums">{fmt(u.montant_du)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -233,145 +293,6 @@ function Finances() {
           </div>
         </div>
       )}
-
-      {/* Dépenses tab */}
-      {activeTab === 'depenses' && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-            <p className="text-sm text-gray-500">Total : <span className="font-semibold text-gray-800">{fmt(data?.total_depenses_realisees)}</span></p>
-            <button onClick={openNewDepense} className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-              Ajouter une dépense
-            </button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[600px]">
-              <thead className="bg-gray-50">
-                <tr>
-                  {['Date', 'Libellé', 'Catégorie', 'Fournisseur', 'Montant', 'Justif.', ''].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {depensesList.length === 0 && (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">Aucune dépense enregistrée</td></tr>
-                )}
-                {depensesList.map((d) => (
-                  <tr key={d.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(d.date_depense)}</td>
-                    <td className="px-4 py-3 font-medium text-gray-800">{d.libelle}</td>
-                    <td className="px-4 py-3">
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{d.categorie}</span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">{d.fournisseur || '—'}</td>
-                    <td className="px-4 py-3 font-semibold text-gray-800">{fmt(d.montant)}</td>
-                    <td className="px-4 py-3">
-                      {d.justificatif_url ? (
-                        <a href={BASE_URL + d.justificatif_url} target="_blank" rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-blue-500 hover:text-blue-700 text-xs">
-                          {d.justificatif_url.endsWith('.pdf') ? (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-                          ) : (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                          )}
-                          Voir
-                        </a>
-                      ) : <span className="text-gray-300 text-xs">—</span>}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-2">
-                        <button onClick={() => openEditDepense(d)} className="text-blue-500 hover:text-blue-700 text-xs">Modifier</button>
-                        <button onClick={() => delDepense(d.id)} className="text-red-400 hover:text-red-600 text-xs">Suppr.</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Modal dépense */}
-      <Modal isOpen={showDepenseForm} onClose={() => setShowDepenseForm(false)} title={editDepenseId ? 'Modifier la dépense' : 'Nouvelle dépense'}>
-        <form onSubmit={saveDepense} className="space-y-4">
-          {formError && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-3">{formError}</div>}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie *</label>
-              <select value={depenseForm.categorie} onChange={(e) => setDepenseForm({ ...depenseForm, categorie: e.target.value })}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
-              <input required type="date" value={depenseForm.date_depense} onChange={(e) => setDepenseForm({ ...depenseForm, date_depense: e.target.value })}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Libellé *</label>
-            <input required value={depenseForm.libelle} onChange={(e) => setDepenseForm({ ...depenseForm, libelle: e.target.value })}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Entretien ascenseur, nettoyage parties communes..." />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Montant (Dhs) *</label>
-              <input required type="number" step="0.01" min="0" value={depenseForm.montant}
-                onChange={(e) => setDepenseForm({ ...depenseForm, montant: e.target.value })}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="1500.00" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Fournisseur</label>
-              <input value={depenseForm.fournisseur} onChange={(e) => setDepenseForm({ ...depenseForm, fournisseur: e.target.value })}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Nom du prestataire" />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">N° facture</label>
-            <input value={depenseForm.numero_facture} onChange={(e) => setDepenseForm({ ...depenseForm, numero_facture: e.target.value })}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="FAC-2024-001" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-            <textarea rows={2} value={depenseForm.notes} onChange={(e) => setDepenseForm({ ...depenseForm, notes: e.target.value })}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Pièce justificative <span className="text-gray-400 font-normal">(optionnel — photo ou PDF)</span></label>
-            {depenseForm.justificatif_url && (
-              <div className="flex items-center gap-2 mb-2 p-2 bg-gray-50 rounded-lg">
-                {depenseForm.justificatif_url.endsWith('.pdf') ? (
-                  <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-                ) : (
-                  <img src={BASE_URL + depenseForm.justificatif_url} alt="Justificatif" className="w-16 h-12 object-cover rounded" />
-                )}
-                <a href={BASE_URL + depenseForm.justificatif_url} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline flex-1 truncate">
-                  Voir le fichier
-                </a>
-                <button type="button" onClick={() => setDepenseForm((f) => ({ ...f, justificatif_url: '' }))}
-                  className="text-gray-400 hover:text-red-500 text-xs">Supprimer</button>
-              </div>
-            )}
-            <input type="file" accept="image/*,application/pdf"
-              onChange={(e) => e.target.files[0] && uploadJustificatif(e.target.files[0])}
-              className="w-full text-sm text-gray-500 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-            {uploading && <p className="text-xs text-gray-400 mt-1">Téléchargement en cours...</p>}
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => setShowDepenseForm(false)} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600">Annuler</button>
-            <button type="submit" disabled={saving} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
-              {saving ? 'Enregistrement...' : 'Enregistrer'}
-            </button>
-          </div>
-        </form>
-      </Modal>
     </div>
   );
 }

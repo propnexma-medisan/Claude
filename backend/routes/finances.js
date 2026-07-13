@@ -121,6 +121,47 @@ router.get('/:coproprieteId', authenticate, (req, res) => {
     const total_cot_a_collecter = cotisationsList.reduce((s, c) => s + c.cot_a_collecter, 0);
     const total_depenses_realisees = depensesList.reduce((s, d) => s + d.montant, 0);
 
+    // Monthly breakdown for chart
+    const recettes_par_mois = db.prepare(`
+      SELECT cp.mois, COALESCE(SUM(cp.montant), 0) as recettes
+      FROM cotisation_paiements cp
+      JOIN cotisations c ON cp.cotisation_id = c.id
+      WHERE c.copropriete_id = ? AND cp.statut = 'Payé'
+        AND strftime('%Y', cp.mois || '-01') = ?
+      GROUP BY cp.mois ORDER BY cp.mois
+    `).all(coproprieteId, String(annee));
+
+    const depenses_par_mois = db.prepare(`
+      SELECT strftime('%Y-%m', date_depense) as mois, COALESCE(SUM(montant), 0) as depenses
+      FROM depenses
+      WHERE copropriete_id = ? AND strftime('%Y', date_depense) = ?
+      GROUP BY mois ORDER BY mois
+    `).all(coproprieteId, String(annee));
+
+    // Dépenses by category for breakdown
+    const depenses_par_categorie = db.prepare(`
+      SELECT categorie, COALESCE(SUM(montant), 0) as total
+      FROM depenses
+      WHERE copropriete_id = ? AND strftime('%Y', date_depense) = ?
+      GROUP BY categorie ORDER BY total DESC
+    `).all(coproprieteId, String(annee));
+
+    // Top impayeurs
+    const top_impayeurs = db.prepare(`
+      SELECT u.prenom, u.nom, l.numero as lot_numero,
+             COALESCE(SUM(CASE WHEN cp.statut != 'Payé' AND cp.mois <= ? THEN cp.montant ELSE 0 END), 0) as montant_du,
+             COUNT(CASE WHEN cp.statut != 'Payé' AND cp.mois <= ? THEN 1 END) as nb_mois
+      FROM cotisations c
+      JOIN users u ON c.user_id = u.id
+      LEFT JOIN lots l ON c.lot_id = l.id
+      LEFT JOIN cotisation_paiements cp ON cp.cotisation_id = c.id
+      WHERE c.copropriete_id = ?
+      GROUP BY c.id
+      HAVING montant_du > 0
+      ORDER BY montant_du DESC
+      LIMIT 5
+    `).all(currentMonth, currentMonth, coproprieteId);
+
     res.json({
       copropriete,
       annee,
@@ -133,6 +174,10 @@ router.get('/:coproprieteId', authenticate, (req, res) => {
       total_cot_impaye,
       total_cot_a_collecter,
       total_depenses_realisees,
+      recettes_par_mois,
+      depenses_par_mois,
+      depenses_par_categorie,
+      top_impayeurs,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
