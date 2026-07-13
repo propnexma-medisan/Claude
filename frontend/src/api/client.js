@@ -110,7 +110,14 @@ export const users = {
 // Tickets
 export const tickets = {
   getAll: (coproprieteId) => api.get(coproprieteId ? `/tickets?copropriete_id=${coproprieteId}` : '/tickets'),
-  create: (data) => api.post('/tickets', data),
+  create: (formData) => {
+    const token = getToken();
+    return fetch(`${BASE_URL}/tickets`, {
+      method: 'POST',
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: formData,
+    }).then((r) => r.ok ? r.json() : r.json().then((e) => Promise.reject(new Error(e.error || 'Erreur'))));
+  },
   update: (id, data) => api.put(`/tickets/${id}`, data),
   getMessages: (id) => api.get(`/tickets/${id}/messages`),
   addMessage: (id, formData) => {

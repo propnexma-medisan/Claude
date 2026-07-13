@@ -20,9 +20,11 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
   storage,
-  limits: { fileSize: 20 * 1024 * 1024 },
+  limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const ok = file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf';
+    const ok = file.mimetype.startsWith('image/') ||
+               file.mimetype.startsWith('video/') ||
+               file.mimetype === 'application/pdf';
     cb(null, ok);
   },
 });
@@ -105,7 +107,7 @@ router.get('/', authenticate, (req, res) => {
 });
 
 // POST /api/tickets — copropriétaire creates ticket
-router.post('/', authenticate, (req, res) => {
+router.post('/', authenticate, upload.array('attachments', 5), (req, res) => {
   try {
     const { titre, description, categorie, priorite } = req.body;
 
@@ -134,6 +136,20 @@ router.post('/', authenticate, (req, res) => {
       JOIN coproprietes c ON t.copropriete_id = c.id
       WHERE t.id = ?
     `).get(result.lastInsertRowid);
+
+    // If files were uploaded with the ticket, save them as a first message
+    const files = req.files || [];
+    if (files.length > 0) {
+      const firstMsg = db.prepare(`
+        INSERT INTO ticket_messages (ticket_id, user_id, message) VALUES (?, ?, ?)
+      `).run(ticket.id, createur_id, '');
+      for (const file of files) {
+        db.prepare(`
+          INSERT INTO ticket_message_attachments (ticket_message_id, filename, original_name, mimetype, size)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(firstMsg.lastInsertRowid, file.filename, file.originalname, file.mimetype, file.size);
+      }
+    }
 
     const gestionnaire = db.prepare(`
       SELECT id, nom, prenom, email FROM users
