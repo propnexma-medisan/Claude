@@ -447,6 +447,63 @@ async function sendAlertExpirationCotisation({ to, prenom, residence, date_fin, 
   });
 }
 
+// ─── 9. Convocation AG (→ copropriétaires) ───────────────────────────────────
+
+async function sendConvocation({ to, prenom, nom, lot_numero, tantiemes, copropriete_nom, copropriete_adresse, date, heure, lieu, type, points, gestionnaire_nom }) {
+  const dateFormate = date ? new Date(date).toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : date;
+
+  const pointsHtml = (points || []).map((pt, i) => `
+    <tr>
+      <td style="padding:5px 8px;color:#1e3a5f;font-weight:bold;vertical-align:top">${i + 1}.</td>
+      <td style="padding:5px 8px;color:#374151">${pt.libelle}${pt.description ? `<br><span style="font-size:12px;color:#6b7280">${pt.description}</span>` : ''}</td>
+      <td style="padding:5px 8px;color:#6b7280;font-size:12px;white-space:nowrap">${pt.type_vote || 'Simple majorité'}</td>
+    </tr>`).join('');
+
+  const content = `
+    <h2 style="color:#1e3a5f;margin-top:0;">Convocation à l'Assemblée Générale</h2>
+    <p style="color:#4b5563;font-size:15px;line-height:1.6;">
+      Bonjour ${prenom || ''} ${nom || ''},<br>
+      Vous êtes convoqué(e) à l'Assemblée Générale <strong>${type || 'Ordinaire'}</strong> de la résidence <strong>${copropriete_nom}</strong>.
+    </p>
+
+    <div style="background:#eff6ff;border:2px solid #bfdbfe;border-radius:8px;padding:20px;margin:20px 0;">
+      <div style="font-size:14px;font-weight:bold;color:#1e3a5f;margin-bottom:12px;">&#128197; Détails de la séance</div>
+      <table cellpadding="0" cellspacing="0" width="100%">
+        ${infoRow('Date', `<strong style="color:#1e3a5f">${dateFormate}</strong>`)}
+        ${infoRow('Heure', `<strong>${heure || '—'}</strong>`)}
+        ${infoRow('Lieu', lieu || '—')}
+        ${copropriete_adresse ? infoRow('Adresse', copropriete_adresse) : ''}
+        ${lot_numero ? infoRow('Votre lot', lot_numero) : ''}
+        ${tantiemes ? infoRow('Vos tantiemes', `${tantiemes}`) : ''}
+      </table>
+    </div>
+
+    ${pointsHtml ? `
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin:20px 0;">
+      <div style="font-size:14px;font-weight:bold;color:#1e3a5f;margin-bottom:12px;">&#128203; Ordre du jour</div>
+      <table cellpadding="0" cellspacing="0" width="100%" style="border-top:1px solid #e5e7eb">
+        ${pointsHtml}
+      </table>
+    </div>` : ''}
+
+    <div style="background:#fefce8;border:1px solid #fef08a;border-radius:6px;padding:12px 16px;font-size:13px;color:#713f12;margin:16px 0;">
+      &#9888; Si vous ne pouvez pas assister à cette assemblée, vous pouvez donner procuration à un autre copropriétaire. Contactez votre gestionnaire.
+    </div>
+
+    <p style="color:#4b5563;font-size:13px;margin-top:16px;">
+      Convocation envoyée par <strong>${gestionnaire_nom || 'votre gestionnaire'}</strong> — Résidence ${copropriete_nom}
+    </p>
+
+    ${ctaButton(APP_URL, 'Accéder à SyndicPro')}
+  `;
+
+  return sendEmail({
+    to,
+    subject: `[SyndicPro] Convocation AG ${type || 'Ordinaire'} – ${copropriete_nom} – ${date || ''}`,
+    html: baseTemplate(content),
+  });
+}
+
 module.exports = {
   sendEmail,
   sendBienvenue,
@@ -457,4 +514,5 @@ module.exports = {
   sendAppelFonds,
   sendMessageBroadcast,
   sendAlertExpirationCotisation,
+  sendConvocation,
 };

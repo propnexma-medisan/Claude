@@ -40,11 +40,22 @@ async function request(path, options = {}) {
   return null;
 }
 
+async function requestHtml(path) {
+  const url = `${BASE_URL}${path}`;
+  const token = getToken();
+  const response = await fetch(url, {
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+  if (!response.ok) throw new Error(`Erreur ${response.status}`);
+  return response.text();
+}
+
 export const api = {
   get: (path) => request(path, { method: 'GET' }),
   post: (path, data) => request(path, { method: 'POST', body: JSON.stringify(data) }),
   put: (path, data) => request(path, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (path) => request(path, { method: 'DELETE' }),
+  getHtml: (path) => requestHtml(path),
 };
 
 // Copropriétés
@@ -77,13 +88,18 @@ export const charges = {
 
 // Assemblées
 export const assemblees = {
-  getAll: () => api.get('/assemblees'),
+  getAll: (copropriete_id) => api.get(copropriete_id ? `/assemblees?copropriete_id=${copropriete_id}` : '/assemblees'),
   getById: (id) => api.get(`/assemblees/${id}`),
   create: (data) => api.post('/assemblees', data),
   update: (id, data) => api.put(`/assemblees/${id}`, data),
   delete: (id) => api.delete(`/assemblees/${id}`),
   getPoints: (id) => api.get(`/assemblees/${id}/points`),
   createPoint: (id, data) => api.post(`/assemblees/${id}/points`, data),
+  convoquer: (id) => api.post(`/assemblees/${id}/convoquer`, {}),
+  getPresences: (id) => api.get(`/assemblees/${id}/presences`),
+  setPresence: (id, data) => api.post(`/assemblees/${id}/presences`, data),
+  getPV: (id) => api.getHtml(`/assemblees/${id}/pv`),
+  getFeuilleEmargement: (id) => api.getHtml(`/assemblees/${id}/feuille-emargement`),
 };
 
 // AG Points

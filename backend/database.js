@@ -359,4 +359,42 @@ try {
   )`);
 } catch {}
 
+// AG — présences par lot
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS assemblee_presences (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    assemblee_id INTEGER NOT NULL REFERENCES assemblees(id) ON DELETE CASCADE,
+    lot_id INTEGER NOT NULL REFERENCES lots(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    statut TEXT NOT NULL DEFAULT 'Absent' CHECK(statut IN ('Présent','Absent','Procuration')),
+    mandataire_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    tantiemes INTEGER DEFAULT 0,
+    UNIQUE(assemblee_id, lot_id)
+  )`);
+} catch {}
+
+// AG — votes par lot et par point
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS assemblee_votes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    point_id INTEGER NOT NULL REFERENCES ag_points(id) ON DELETE CASCADE,
+    lot_id INTEGER NOT NULL REFERENCES lots(id) ON DELETE CASCADE,
+    vote TEXT NOT NULL CHECK(vote IN ('Pour','Contre','Abstention')),
+    tantiemes INTEGER DEFAULT 0,
+    UNIQUE(point_id, lot_id)
+  )`);
+} catch {}
+
+// Colonnes supplémentaires sur assemblees
+try { db.exec('ALTER TABLE assemblees ADD COLUMN quorum_requis INTEGER DEFAULT 50'); } catch {}
+try { db.exec('ALTER TABLE assemblees ADD COLUMN tantiemes_presents INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE assemblees ADD COLUMN total_tantiemes INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE assemblees ADD COLUMN pv_genere INTEGER DEFAULT 0'); } catch {}
+
+// Colonnes supplémentaires sur ag_points
+try { db.exec('ALTER TABLE ag_points ADD COLUMN tantiemes_pour INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE ag_points ADD COLUMN tantiemes_contre INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE ag_points ADD COLUMN tantiemes_abstention INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE ag_points ADD COLUMN notes TEXT'); } catch {}
+
 module.exports = db;
