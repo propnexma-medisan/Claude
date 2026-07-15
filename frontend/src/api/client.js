@@ -1,6 +1,8 @@
-// En production (Nginx), l'API est proxifiée sur /api (même domaine).
+// VITE_API_URL est requis pour les builds Capacitor (Android/iOS).
+// En prod web (Nginx), l'API est proxifiée sur /api (même domaine).
 // En développement local, on passe par localhost:3001.
-const BASE_URL = import.meta.env.PROD ? '/api' : 'http://localhost:3001/api';
+const BASE_URL = import.meta.env.VITE_API_URL
+  || (import.meta.env.PROD ? '/api' : 'http://localhost:3001/api');
 
 function getToken() {
   return localStorage.getItem('syndic_token');
