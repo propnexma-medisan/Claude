@@ -666,6 +666,8 @@ function CotisationDetail({ cotisationId, coproprieteId, onRefresh, onDelete }) 
   const [newDateFin, setNewDateFin] = useState('');
   const [showStatutMenu, setShowStatutMenu] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [sendingQuitus, setSendingQuitus] = useState(false);
+  const [quitusSent, setQuitusSent] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -698,6 +700,29 @@ function CotisationDetail({ cotisationId, coproprieteId, onRefresh, onDelete }) 
       onRefresh();
     } finally {
       setSaving(false);
+    }
+  }
+
+  function openQuitus() {
+    cotisations.getQuitus(detail.id).then((html) => {
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }).catch((e) => alert(e.message));
+  }
+
+  async function handleSendQuitus() {
+    setSendingQuitus(true);
+    setQuitusSent(false);
+    try {
+      await cotisations.sendQuitus(detail.id);
+      setQuitusSent(true);
+      setTimeout(() => setQuitusSent(false), 3000);
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setSendingQuitus(false);
     }
   }
 
@@ -851,6 +876,40 @@ function CotisationDetail({ cotisationId, coproprieteId, onRefresh, onDelete }) 
       {/* Justificatifs */}
       <div className="px-6 py-5 border-b border-gray-100">
         <PreuvesSection cotisationId={cotisationId} initialPreuves={detail.preuves || []} />
+      </div>
+
+      {/* Quitus */}
+      <div className="px-6 py-5 border-b border-gray-100">
+        <h3 className="font-semibold text-gray-800 mb-3">Documents</h3>
+        <div className="flex gap-3 flex-wrap">
+          <button
+            onClick={openQuitus}
+            className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Imprimer le quitus
+          </button>
+          <button
+            onClick={handleSendQuitus}
+            disabled={sendingQuitus}
+            className="flex items-center gap-2 px-4 py-2 text-sm border border-green-200 text-green-700 rounded-lg hover:bg-green-50 transition-colors disabled:opacity-50"
+          >
+            {sendingQuitus ? (
+              <span className="w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
+            ) : quitusSent ? (
+              <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            )}
+            {sendingQuitus ? 'Envoi...' : quitusSent ? 'Quitus envoyé !' : 'Envoyer le quitus par email'}
+          </button>
+        </div>
       </div>
 
       {/* Historique relances */}

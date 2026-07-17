@@ -504,6 +504,62 @@ async function sendConvocation({ to, prenom, nom, lot_numero, tantiemes, copropr
   });
 }
 
+// ─── 10. Quitus de cotisation (→ copropriétaire) ─────────────────────────────
+
+async function sendQuitus({ to, prenom, nom, lot_numero, copropriete_nom, copropriete_adresse, montant_mensuel, date_debut, date_fin, nb_mois_payes, total_paye, gestionnaire_nom }) {
+  const fmtMAD = (n) => (n || 0).toLocaleString('fr-MA', { minimumFractionDigits: 2 }) + ' MAD';
+  const fmtPeriod = (d) => {
+    if (!d) return '—';
+    const s = d.length === 7 ? d : d.substring(0, 7);
+    const [y, m] = s.split('-');
+    return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  };
+  const today = new Date().toLocaleDateString('fr-FR');
+
+  const content = `
+    <h2 style="color:#1e3a5f;margin-top:0;">Quitus de cotisation</h2>
+    <p style="color:#4b5563;font-size:15px;line-height:1.6;">
+      Bonjour ${prenom || ''} ${nom || ''},<br>
+      Nous avons le plaisir de vous confirmer que votre cotisation pour la résidence <strong>${copropriete_nom}</strong> est en règle.
+    </p>
+
+    <div style="background:#f0fdf4;border:2px solid #bbf7d0;border-radius:8px;padding:20px;margin:20px 0;text-align:center;">
+      <div style="font-size:40px;margin-bottom:8px;">&#9989;</div>
+      <div style="color:#065f46;font-size:18px;font-weight:bold;">Quitus accordé</div>
+      <div style="color:#6b7280;font-size:13px;margin-top:4px;">Cotisation à jour au ${today}</div>
+    </div>
+
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin:20px 0;">
+      <div style="font-size:14px;font-weight:bold;color:#1e3a5f;margin-bottom:12px;">&#128203; Détails de la cotisation</div>
+      <table cellpadding="0" cellspacing="0" width="100%">
+        ${lot_numero ? infoRow('Lot', `N° ${lot_numero}`) : ''}
+        ${infoRow('Résidence', copropriete_nom)}
+        ${copropriete_adresse ? infoRow('Adresse', copropriete_adresse) : ''}
+        ${infoRow('Période', `${fmtPeriod(date_debut)} → ${fmtPeriod(date_fin)}`)}
+        ${infoRow('Montant mensuel', `<strong>${fmtMAD(montant_mensuel)}</strong>`)}
+        ${infoRow('Mois réglés', `<strong style="color:#16a34a;">${nb_mois_payes} mois</strong>`)}
+        ${infoRow('Total réglé', `<strong style="color:#1e3a5f;font-size:15px;">${fmtMAD(total_paye)}</strong>`)}
+      </table>
+    </div>
+
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:12px 16px;margin:16px 0;font-size:13px;color:#1e40af;">
+      &#8505; Ce quitus certifie que vous êtes à jour de vos cotisations au ${today}. Conservez ce document à titre de justificatif.
+    </div>
+
+    <p style="color:#4b5563;font-size:13px;margin-top:16px;">
+      Document émis par <strong>${gestionnaire_nom || 'votre gestionnaire'}</strong> — Résidence ${copropriete_nom}
+    </p>
+
+    ${ctaButton(APP_URL, 'Accéder à SyndicPro')}
+  `;
+
+  return sendEmail({
+    to,
+    subject: `[SyndicPro] Quitus de cotisation – ${copropriete_nom}`,
+    html: baseTemplate(content),
+  });
+}
+
 module.exports = {
   sendEmail,
   sendBienvenue,
@@ -515,4 +571,5 @@ module.exports = {
   sendMessageBroadcast,
   sendAlertExpirationCotisation,
   sendConvocation,
+  sendQuitus,
 };

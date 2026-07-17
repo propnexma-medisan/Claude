@@ -5,7 +5,7 @@ const fs = require('fs');
 const multer = require('multer');
 const db = require('../database');
 const { authenticate, requireRole } = require('../middleware/auth');
-const { sendRelance } = require('../services/email');
+const { sendRelance, sendQuitus } = require('../services/email');
 
 const uploadDir = path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
@@ -43,6 +43,129 @@ function generateMonths(dateDebut, dateFin) {
 function toYYYYMM(dateStr) {
   if (!dateStr) return null;
   return dateStr.substring(0, 7);
+}
+
+// ─── Quitus HTML generator ───────────────────────────────────────────────────
+
+function htmlQuitus(cotisation, paiements, copropriete, gestionnaire) {
+  const dateDoc = new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' });
+  const fmtPeriod = (d) => {
+    if (!d) return '—';
+    const s = d.length === 7 ? d : d.substring(0, 7);
+    const [y, m] = s.split('-');
+    return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  };
+  const fmtMAD = (n) => (n || 0).toLocaleString('fr-MA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' MAD';
+  const paiementsPayes = (paiements || []).filter((p) => p.statut === 'Payé');
+  const totalPaye = paiementsPayes.reduce((s, p) => s + (p.montant || 0), 0);
+  const nomComplet = `${cotisation.prenom || ''} ${cotisation.nom || ''}`.trim();
+  const gestionnaireNom = gestionnaire ? `${gestionnaire.prenom || ''} ${gestionnaire.nom || ''}`.trim() : 'Le Gestionnaire';
+
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Quitus de Cotisation – ${nomComplet}</title>
+  <style>
+    @page { size: A4; margin: 20mm 25mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Times New Roman', Times, Georgia, serif; font-size: 12pt; color: #1a1a2e; background: white; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 16pt; border-bottom: 2pt solid #1e3a5f; margin-bottom: 24pt; }
+    .syndic-name { font-size: 16pt; font-weight: bold; color: #1e3a5f; }
+    .syndic-sub { font-size: 10pt; color: #6b7280; margin-top: 3pt; }
+    .ref-label { font-size: 9pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5pt; }
+    .ref-value { font-size: 10pt; font-weight: bold; color: #1e3a5f; }
+    .doc-title { text-align: center; margin: 24pt 0 20pt; }
+    .doc-title h1 { font-size: 18pt; font-weight: bold; color: #1e3a5f; text-transform: uppercase; letter-spacing: 2pt; }
+    .doc-title .underline { height: 2pt; background: #1e3a5f; width: 120pt; margin: 8pt auto 0; }
+    .attestation { background: #f0f4f8; border-left: 4pt solid #1e3a5f; padding: 14pt 18pt; margin: 20pt 0; font-size: 12pt; line-height: 1.7; }
+    .details-box { border: 1pt solid #d1d5db; border-radius: 4pt; padding: 14pt 18pt; margin: 18pt 0; }
+    .details-box h3 { font-size: 10pt; text-transform: uppercase; letter-spacing: 0.5pt; color: #6b7280; margin-bottom: 10pt; padding-bottom: 6pt; border-bottom: 1pt solid #e5e7eb; }
+    .detail-row { display: flex; justify-content: space-between; padding: 4pt 0; font-size: 11pt; border-bottom: 0.5pt solid #f3f4f6; }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-label { color: #4b5563; }
+    .detail-value { font-weight: bold; color: #1a1a2e; }
+    .total-box { background: #1e3a5f; color: white; padding: 12pt 18pt; border-radius: 4pt; margin: 16pt 0; display: flex; justify-content: space-between; align-items: center; }
+    .total-label { font-size: 10pt; text-transform: uppercase; letter-spacing: 0.5pt; opacity: 0.8; }
+    .total-amount { font-size: 16pt; font-weight: bold; }
+    .signature-section { margin-top: 32pt; display: flex; justify-content: space-between; }
+    .sig-block { width: 45%; }
+    .sig-title { font-size: 10pt; font-weight: bold; color: #1e3a5f; text-transform: uppercase; letter-spacing: 0.5pt; margin-bottom: 4pt; }
+    .sig-date { font-size: 10pt; color: #4b5563; margin-bottom: 40pt; }
+    .sig-line { border-top: 1pt solid #9ca3af; padding-top: 6pt; font-size: 10pt; color: #4b5563; }
+    .footer { margin-top: 40pt; padding-top: 8pt; border-top: 0.5pt solid #e5e7eb; text-align: center; font-size: 9pt; color: #9ca3af; }
+    .print-btn { position: fixed; top: 10px; right: 10px; padding: 8px 16px; background: #1e3a5f; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; z-index: 100; font-family: Arial, sans-serif; }
+    @media print { .print-btn { display: none !important; } }
+  </style>
+</head>
+<body>
+  <button class="print-btn" onclick="window.print()">🖨 Imprimer</button>
+
+  <div class="header">
+    <div>
+      <div class="syndic-name">🏛 SyndicPro</div>
+      <div class="syndic-sub">Gestion de Copropriété</div>
+      ${copropriete ? `<div class="syndic-sub" style="margin-top:6pt;color:#374151;">${copropriete.nom || ''}</div>` : ''}
+      ${copropriete && copropriete.adresse ? `<div class="syndic-sub">${copropriete.adresse}</div>` : ''}
+    </div>
+    <div style="text-align:right;">
+      <div class="ref-label">Document N°</div>
+      <div class="ref-value">QUI-${String(cotisation.id).padStart(5, '0')}</div>
+      <div class="ref-label" style="margin-top:6pt;">Date d'émission</div>
+      <div class="ref-value">${dateDoc}</div>
+    </div>
+  </div>
+
+  <div class="doc-title">
+    <h1>Quitus de Cotisation</h1>
+    <div class="underline"></div>
+  </div>
+
+  <div class="attestation">
+    Je soussigné(e), <strong>${gestionnaireNom}</strong>, Syndic/Gestionnaire de la résidence
+    <strong>${copropriete ? copropriete.nom : ''}</strong>, certifie par la présente que&nbsp;:
+    <br><br>
+    M./Mme <strong>${nomComplet}</strong>${cotisation.lot_numero ? `, propriétaire du lot N°&nbsp;<strong>${cotisation.lot_numero}</strong>` : ''},
+    est à jour de ses cotisations de charges communes pour la période allant
+    de <strong>${fmtPeriod(cotisation.date_debut)}</strong> à <strong>${fmtPeriod(cotisation.date_fin)}</strong>.
+  </div>
+
+  <div class="details-box">
+    <h3>Détails de la cotisation</h3>
+    ${cotisation.lot_numero ? `<div class="detail-row"><span class="detail-label">Lot</span><span class="detail-value">N° ${cotisation.lot_numero}${cotisation.lot_type ? ` — ${cotisation.lot_type}` : ''}</span></div>` : ''}
+    <div class="detail-row"><span class="detail-label">Copropriétaire</span><span class="detail-value">${nomComplet}</span></div>
+    <div class="detail-row"><span class="detail-label">Résidence</span><span class="detail-value">${copropriete ? copropriete.nom : '—'}</span></div>
+    <div class="detail-row"><span class="detail-label">Période</span><span class="detail-value">${fmtPeriod(cotisation.date_debut)} → ${fmtPeriod(cotisation.date_fin)}</span></div>
+    <div class="detail-row"><span class="detail-label">Montant mensuel</span><span class="detail-value">${fmtMAD(cotisation.montant_mensuel)}</span></div>
+    <div class="detail-row"><span class="detail-label">Nombre de mois</span><span class="detail-value">${(paiements || []).length} mois</span></div>
+    <div class="detail-row"><span class="detail-label">Mois réglés</span><span class="detail-value" style="color:#16a34a;">${paiementsPayes.length} mois</span></div>
+    ${cotisation.notes ? `<div class="detail-row"><span class="detail-label">Notes</span><span class="detail-value">${cotisation.notes}</span></div>` : ''}
+  </div>
+
+  <div class="total-box">
+    <span class="total-label">Total réglé</span>
+    <span class="total-amount">${fmtMAD(totalPaye)}</span>
+  </div>
+
+  <div class="signature-section">
+    <div class="sig-block">
+      <div class="sig-title">Le Syndic / Gestionnaire</div>
+      <div class="sig-date">Fait à ______________________, le ${dateDoc}</div>
+      <div class="sig-line">Signature et cachet</div>
+    </div>
+    <div class="sig-block" style="text-align:right;">
+      <div class="sig-title">Le Copropriétaire</div>
+      <div class="sig-date">Reçu le ______________________</div>
+      <div class="sig-line">Signature pour acquit</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Ce document est généré automatiquement par SyndicPro – Gestion de Copropriété
+    ${copropriete ? `· Résidence ${copropriete.nom}` : ''}
+  </div>
+</body>
+</html>`;
 }
 
 // ─── ALERTES ── must be BEFORE /:id ──────────────────────────────────────────
@@ -311,6 +434,78 @@ router.delete('/cotisations/:id', authenticate, (req, res) => {
     // Nullify foreign key in relances before deleting (no CASCADE on that FK)
     db.prepare('UPDATE relances SET cotisation_id = NULL WHERE cotisation_id = ?').run(req.params.id);
     db.prepare('DELETE FROM cotisations WHERE id = ?').run(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/cotisations/:id/quitus
+router.get('/cotisations/:id/quitus', authenticate, (req, res) => {
+  try {
+    if (req.user.role === 'copropietaire' || req.user.role === 'membre_bureau') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+    const cotisation = db.prepare(`
+      SELECT c.*, u.nom, u.prenom, u.email,
+        l.numero as lot_numero, l.type as lot_type
+      FROM cotisations c
+      JOIN users u ON c.user_id = u.id
+      LEFT JOIN lots l ON c.lot_id = l.id
+      WHERE c.id = ?
+    `).get(req.params.id);
+    if (!cotisation) return res.status(404).json({ error: 'Cotisation introuvable' });
+
+    const paiements = db.prepare('SELECT * FROM cotisation_paiements WHERE cotisation_id = ? ORDER BY mois ASC').all(req.params.id);
+    const copropriete = db.prepare('SELECT * FROM coproprietes WHERE id = ?').get(cotisation.copropriete_id);
+    const gestionnaire = db.prepare('SELECT nom, prenom FROM users WHERE id = ?').get(req.user.id);
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(htmlQuitus(cotisation, paiements, copropriete, gestionnaire));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/cotisations/:id/send-quitus
+router.post('/cotisations/:id/send-quitus', authenticate, async (req, res) => {
+  try {
+    if (req.user.role === 'copropietaire' || req.user.role === 'membre_bureau') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+    const cotisation = db.prepare(`
+      SELECT c.*, u.nom, u.prenom, u.email,
+        l.numero as lot_numero, l.type as lot_type
+      FROM cotisations c
+      JOIN users u ON c.user_id = u.id
+      LEFT JOIN lots l ON c.lot_id = l.id
+      WHERE c.id = ?
+    `).get(req.params.id);
+    if (!cotisation) return res.status(404).json({ error: 'Cotisation introuvable' });
+
+    const paiements = db.prepare('SELECT * FROM cotisation_paiements WHERE cotisation_id = ? ORDER BY mois ASC').all(req.params.id);
+    const copropriete = db.prepare('SELECT * FROM coproprietes WHERE id = ?').get(cotisation.copropriete_id);
+    const gestionnaire = db.prepare('SELECT nom, prenom FROM users WHERE id = ?').get(req.user.id);
+
+    const paiementsPayes = paiements.filter((p) => p.statut === 'Payé');
+    const totalPaye = paiementsPayes.reduce((s, p) => s + (p.montant || 0), 0);
+    const gestionnaireNom = gestionnaire ? `${gestionnaire.prenom || ''} ${gestionnaire.nom || ''}`.trim() : '';
+
+    await sendQuitus({
+      to: cotisation.email,
+      prenom: cotisation.prenom,
+      nom: cotisation.nom,
+      lot_numero: cotisation.lot_numero,
+      copropriete_nom: copropriete ? copropriete.nom : '',
+      copropriete_adresse: copropriete ? copropriete.adresse : '',
+      montant_mensuel: cotisation.montant_mensuel,
+      date_debut: cotisation.date_debut,
+      date_fin: cotisation.date_fin,
+      nb_mois_payes: paiementsPayes.length,
+      total_paye: totalPaye,
+      gestionnaire_nom: gestionnaireNom,
+    });
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
