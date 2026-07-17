@@ -19,7 +19,7 @@ export async function initCapacitor() {
   if (!isNative()) return;
 
   try {
-    const { StatusBar, Style } = await import('@capacitor/status-bar');
+    const { StatusBar, Style } = await import(/* @vite-ignore */ '@capacitor/status-bar');
     await StatusBar.setStyle({ style: Style.Dark });
     if (getPlatform() === 'android') {
       await StatusBar.setBackgroundColor({ color: '#1e3a5f' });
@@ -29,7 +29,7 @@ export async function initCapacitor() {
   }
 
   try {
-    const { SplashScreen } = await import('@capacitor/splash-screen');
+    const { SplashScreen } = await import(/* @vite-ignore */ '@capacitor/splash-screen');
     await SplashScreen.hide({ fadeOutDuration: 300 });
   } catch (e) {
     console.warn('[Capacitor] SplashScreen init failed:', e.message);
@@ -41,7 +41,7 @@ export async function registerPushNotifications(onToken, onNotification) {
   if (!isNative()) return;
 
   try {
-    const { PushNotifications } = await import('@capacitor/push-notifications');
+    const { PushNotifications } = await import(/* @vite-ignore */ '@capacitor/push-notifications');
 
     const permission = await PushNotifications.requestPermissions();
     if (permission.receive !== 'granted') return;
