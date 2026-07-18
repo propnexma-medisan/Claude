@@ -56,45 +56,63 @@ function htmlQuitus(cotisation, paiements, copropriete, gestionnaire) {
     return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   };
   const fmtMAD = (n) => (n || 0).toLocaleString('fr-MA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' MAD';
-  const paiementsPayes = (paiements || []).filter((p) => p.statut === 'Payé');
+  const allPaiements = paiements || [];
+  const paiementsPayes = allPaiements.filter((p) => p.statut === 'Payé');
   const totalPaye = paiementsPayes.reduce((s, p) => s + (p.montant || 0), 0);
+  const totalAttendu = allPaiements.reduce((s, p) => s + (p.montant || 0), 0);
+  const soldeTotalRestant = totalAttendu - totalPaye;
+  const estSolde = allPaiements.length > 0 && paiementsPayes.length === allPaiements.length;
   const nomComplet = `${cotisation.prenom || ''} ${cotisation.nom || ''}`.trim();
   const gestionnaireNom = gestionnaire ? `${gestionnaire.prenom || ''} ${gestionnaire.nom || ''}`.trim() : 'Le Gestionnaire';
+  const titreDoc = estSolde ? 'Quitus de Cotisation' : 'Reçu de Paiement Partiel';
+  const refPrefix = estSolde ? 'QUI' : 'RPP';
+  const accentColor = estSolde ? '#1e3a5f' : '#b45309';
+  const totalBoxBg = estSolde ? '#1e3a5f' : '#92400e';
+
+  const attestationText = estSolde
+    ? `M./Mme <strong>${nomComplet}</strong>${cotisation.lot_numero ? `, propriétaire du lot N°&nbsp;<strong>${cotisation.lot_numero}</strong>` : ''},
+    est à jour de ses cotisations de charges communes pour la période allant
+    de <strong>${fmtPeriod(cotisation.date_debut)}</strong> à <strong>${fmtPeriod(cotisation.date_fin)}</strong>.`
+    : `M./Mme <strong>${nomComplet}</strong>${cotisation.lot_numero ? `, propriétaire du lot N°&nbsp;<strong>${cotisation.lot_numero}</strong>` : ''},
+    a réglé <strong>${paiementsPayes.length} mois</strong> de cotisations sur <strong>${allPaiements.length} mois</strong> prévus
+    pour la période allant de <strong>${fmtPeriod(cotisation.date_debut)}</strong> à <strong>${fmtPeriod(cotisation.date_fin)}</strong>.
+    <br><br>
+    <strong style="color:#b45309;">⚠ Solde restant dû : ${fmtMAD(soldeTotalRestant)}</strong> — Ce document ne constitue pas un quitus et ne libère pas le copropriétaire de ses obligations.`;
 
   return `<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <title>Quitus de Cotisation – ${nomComplet}</title>
+  <title>${titreDoc} – ${nomComplet}</title>
   <style>
     @page { size: A4; margin: 20mm 25mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Times New Roman', Times, Georgia, serif; font-size: 12pt; color: #1a1a2e; background: white; }
-    .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 16pt; border-bottom: 2pt solid #1e3a5f; margin-bottom: 24pt; }
-    .syndic-name { font-size: 16pt; font-weight: bold; color: #1e3a5f; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 16pt; border-bottom: 2pt solid ${accentColor}; margin-bottom: 24pt; }
+    .syndic-name { font-size: 16pt; font-weight: bold; color: ${accentColor}; }
     .syndic-sub { font-size: 10pt; color: #6b7280; margin-top: 3pt; }
     .ref-label { font-size: 9pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5pt; }
-    .ref-value { font-size: 10pt; font-weight: bold; color: #1e3a5f; }
+    .ref-value { font-size: 10pt; font-weight: bold; color: ${accentColor}; }
     .doc-title { text-align: center; margin: 24pt 0 20pt; }
-    .doc-title h1 { font-size: 18pt; font-weight: bold; color: #1e3a5f; text-transform: uppercase; letter-spacing: 2pt; }
-    .doc-title .underline { height: 2pt; background: #1e3a5f; width: 120pt; margin: 8pt auto 0; }
-    .attestation { background: #f0f4f8; border-left: 4pt solid #1e3a5f; padding: 14pt 18pt; margin: 20pt 0; font-size: 12pt; line-height: 1.7; }
+    .doc-title h1 { font-size: 18pt; font-weight: bold; color: ${accentColor}; text-transform: uppercase; letter-spacing: 2pt; }
+    .doc-title .underline { height: 2pt; background: ${accentColor}; width: 160pt; margin: 8pt auto 0; }
+    .attestation { background: ${estSolde ? '#f0f4f8' : '#fef3c7'}; border-left: 4pt solid ${accentColor}; padding: 14pt 18pt; margin: 20pt 0; font-size: 12pt; line-height: 1.7; }
     .details-box { border: 1pt solid #d1d5db; border-radius: 4pt; padding: 14pt 18pt; margin: 18pt 0; }
     .details-box h3 { font-size: 10pt; text-transform: uppercase; letter-spacing: 0.5pt; color: #6b7280; margin-bottom: 10pt; padding-bottom: 6pt; border-bottom: 1pt solid #e5e7eb; }
     .detail-row { display: flex; justify-content: space-between; padding: 4pt 0; font-size: 11pt; border-bottom: 0.5pt solid #f3f4f6; }
     .detail-row:last-child { border-bottom: none; }
     .detail-label { color: #4b5563; }
     .detail-value { font-weight: bold; color: #1a1a2e; }
-    .total-box { background: #1e3a5f; color: white; padding: 12pt 18pt; border-radius: 4pt; margin: 16pt 0; display: flex; justify-content: space-between; align-items: center; }
+    .total-box { background: ${totalBoxBg}; color: white; padding: 12pt 18pt; border-radius: 4pt; margin: 16pt 0; display: flex; justify-content: space-between; align-items: center; }
     .total-label { font-size: 10pt; text-transform: uppercase; letter-spacing: 0.5pt; opacity: 0.8; }
     .total-amount { font-size: 16pt; font-weight: bold; }
     .signature-section { margin-top: 32pt; display: flex; justify-content: space-between; }
     .sig-block { width: 45%; }
-    .sig-title { font-size: 10pt; font-weight: bold; color: #1e3a5f; text-transform: uppercase; letter-spacing: 0.5pt; margin-bottom: 4pt; }
+    .sig-title { font-size: 10pt; font-weight: bold; color: ${accentColor}; text-transform: uppercase; letter-spacing: 0.5pt; margin-bottom: 4pt; }
     .sig-date { font-size: 10pt; color: #4b5563; margin-bottom: 40pt; }
     .sig-line { border-top: 1pt solid #9ca3af; padding-top: 6pt; font-size: 10pt; color: #4b5563; }
     .footer { margin-top: 40pt; padding-top: 8pt; border-top: 0.5pt solid #e5e7eb; text-align: center; font-size: 9pt; color: #9ca3af; }
-    .print-btn { position: fixed; top: 10px; right: 10px; padding: 8px 16px; background: #1e3a5f; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; z-index: 100; font-family: Arial, sans-serif; }
+    .print-btn { position: fixed; top: 10px; right: 10px; padding: 8px 16px; background: ${accentColor}; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; z-index: 100; font-family: Arial, sans-serif; }
     @media print { .print-btn { display: none !important; } }
   </style>
 </head>
@@ -110,14 +128,14 @@ function htmlQuitus(cotisation, paiements, copropriete, gestionnaire) {
     </div>
     <div style="text-align:right;">
       <div class="ref-label">Document N°</div>
-      <div class="ref-value">QUI-${String(cotisation.id).padStart(5, '0')}</div>
+      <div class="ref-value">${refPrefix}-${String(cotisation.id).padStart(5, '0')}</div>
       <div class="ref-label" style="margin-top:6pt;">Date d'émission</div>
       <div class="ref-value">${dateDoc}</div>
     </div>
   </div>
 
   <div class="doc-title">
-    <h1>Quitus de Cotisation</h1>
+    <h1>${titreDoc}</h1>
     <div class="underline"></div>
   </div>
 
@@ -125,9 +143,7 @@ function htmlQuitus(cotisation, paiements, copropriete, gestionnaire) {
     Je soussigné(e), <strong>${gestionnaireNom}</strong>, Syndic/Gestionnaire de la résidence
     <strong>${copropriete ? copropriete.nom : ''}</strong>, certifie par la présente que&nbsp;:
     <br><br>
-    M./Mme <strong>${nomComplet}</strong>${cotisation.lot_numero ? `, propriétaire du lot N°&nbsp;<strong>${cotisation.lot_numero}</strong>` : ''},
-    est à jour de ses cotisations de charges communes pour la période allant
-    de <strong>${fmtPeriod(cotisation.date_debut)}</strong> à <strong>${fmtPeriod(cotisation.date_fin)}</strong>.
+    ${attestationText}
   </div>
 
   <div class="details-box">
@@ -137,14 +153,15 @@ function htmlQuitus(cotisation, paiements, copropriete, gestionnaire) {
     <div class="detail-row"><span class="detail-label">Résidence</span><span class="detail-value">${copropriete ? copropriete.nom : '—'}</span></div>
     <div class="detail-row"><span class="detail-label">Période</span><span class="detail-value">${fmtPeriod(cotisation.date_debut)} → ${fmtPeriod(cotisation.date_fin)}</span></div>
     <div class="detail-row"><span class="detail-label">Montant mensuel</span><span class="detail-value">${fmtMAD(cotisation.montant_mensuel)}</span></div>
-    <div class="detail-row"><span class="detail-label">Nombre de mois</span><span class="detail-value">${(paiements || []).length} mois</span></div>
-    <div class="detail-row"><span class="detail-label">Mois réglés</span><span class="detail-value" style="color:#16a34a;">${paiementsPayes.length} mois</span></div>
+    <div class="detail-row"><span class="detail-label">Total attendu</span><span class="detail-value">${fmtMAD(totalAttendu)}</span></div>
+    <div class="detail-row"><span class="detail-label">Mois réglés</span><span class="detail-value" style="color:${estSolde ? '#16a34a' : '#b45309'};">${paiementsPayes.length} / ${allPaiements.length} mois</span></div>
+    ${!estSolde ? `<div class="detail-row"><span class="detail-label">Solde restant dû</span><span class="detail-value" style="color:#dc2626;">${fmtMAD(soldeTotalRestant)}</span></div>` : ''}
     ${cotisation.notes ? `<div class="detail-row"><span class="detail-label">Notes</span><span class="detail-value">${cotisation.notes}</span></div>` : ''}
   </div>
 
   <div class="total-box">
     <span class="total-label">Total réglé</span>
-    <span class="total-amount">${fmtMAD(totalPaye)}</span>
+    <span class="total-amount">${fmtMAD(totalPaye)}${!estSolde ? ` <span style="font-size:10pt;opacity:0.7;">/ ${fmtMAD(totalAttendu)}</span>` : ''}</span>
   </div>
 
   <div class="signature-section">
