@@ -90,33 +90,33 @@ function htmlQuitus(cotisation, paiements, copropriete, gestionnaire) {
   <meta charset="utf-8">
   <title>${titreDoc} – ${nomComplet}</title>
   <style>
-    @page { size: A4; margin: 20mm 25mm; }
+    @page { size: A4; margin: 12mm 18mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Times New Roman', Times, Georgia, serif; font-size: 12pt; color: #1a1a2e; background: white; }
-    .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 16pt; border-bottom: 2pt solid ${accentColor}; margin-bottom: 24pt; }
-    .syndic-name { font-size: 16pt; font-weight: bold; color: ${accentColor}; }
-    .syndic-sub { font-size: 10pt; color: #6b7280; margin-top: 3pt; }
-    .ref-label { font-size: 9pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5pt; }
-    .ref-value { font-size: 10pt; font-weight: bold; color: ${accentColor}; }
-    .doc-title { text-align: center; margin: 24pt 0 20pt; }
-    .doc-title h1 { font-size: 18pt; font-weight: bold; color: ${accentColor}; text-transform: uppercase; letter-spacing: 2pt; }
-    .doc-title .underline { height: 2pt; background: ${accentColor}; width: 160pt; margin: 8pt auto 0; }
-    .attestation { background: ${estSolde ? '#f0f4f8' : '#fef3c7'}; border-left: 4pt solid ${accentColor}; padding: 14pt 18pt; margin: 20pt 0; font-size: 12pt; line-height: 1.7; }
-    .details-box { border: 1pt solid #d1d5db; border-radius: 4pt; padding: 14pt 18pt; margin: 18pt 0; }
-    .details-box h3 { font-size: 10pt; text-transform: uppercase; letter-spacing: 0.5pt; color: #6b7280; margin-bottom: 10pt; padding-bottom: 6pt; border-bottom: 1pt solid #e5e7eb; }
-    .detail-row { display: flex; justify-content: space-between; padding: 4pt 0; font-size: 11pt; border-bottom: 0.5pt solid #f3f4f6; }
+    body { font-family: 'Times New Roman', Times, Georgia, serif; font-size: 10.5pt; color: #1a1a2e; background: white; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 8pt; border-bottom: 2pt solid ${accentColor}; margin-bottom: 10pt; }
+    .syndic-name { font-size: 14pt; font-weight: bold; color: ${accentColor}; }
+    .syndic-sub { font-size: 9pt; color: #6b7280; margin-top: 2pt; }
+    .ref-label { font-size: 8pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5pt; }
+    .ref-value { font-size: 9.5pt; font-weight: bold; color: ${accentColor}; }
+    .doc-title { text-align: center; margin: 10pt 0 8pt; }
+    .doc-title h1 { font-size: 15pt; font-weight: bold; color: ${accentColor}; text-transform: uppercase; letter-spacing: 2pt; }
+    .doc-title .underline { height: 2pt; background: ${accentColor}; width: 140pt; margin: 5pt auto 0; }
+    .attestation { background: ${estSolde ? '#f0f4f8' : '#fef3c7'}; border-left: 4pt solid ${accentColor}; padding: 9pt 13pt; margin: 10pt 0; font-size: 10.5pt; line-height: 1.6; }
+    .details-box { border: 1pt solid #d1d5db; border-radius: 4pt; padding: 8pt 13pt; margin: 8pt 0; }
+    .details-box h3 { font-size: 9pt; text-transform: uppercase; letter-spacing: 0.5pt; color: #6b7280; margin-bottom: 6pt; padding-bottom: 4pt; border-bottom: 1pt solid #e5e7eb; }
+    .detail-row { display: flex; justify-content: space-between; padding: 3pt 0; font-size: 10pt; border-bottom: 0.5pt solid #f3f4f6; }
     .detail-row:last-child { border-bottom: none; }
     .detail-label { color: #4b5563; }
     .detail-value { font-weight: bold; color: #1a1a2e; }
-    .total-box { background: ${totalBoxBg}; color: white; padding: 12pt 18pt; border-radius: 4pt; margin: 16pt 0; display: flex; justify-content: space-between; align-items: center; }
-    .total-label { font-size: 10pt; text-transform: uppercase; letter-spacing: 0.5pt; opacity: 0.8; }
-    .total-amount { font-size: 16pt; font-weight: bold; }
-    .signature-section { margin-top: 32pt; display: flex; justify-content: space-between; }
+    .total-box { background: ${totalBoxBg}; color: white; padding: 8pt 13pt; border-radius: 4pt; margin: 8pt 0; display: flex; justify-content: space-between; align-items: center; }
+    .total-label { font-size: 9pt; text-transform: uppercase; letter-spacing: 0.5pt; opacity: 0.8; }
+    .total-amount { font-size: 14pt; font-weight: bold; }
+    .signature-section { margin-top: 14pt; display: flex; justify-content: space-between; }
     .sig-block { width: 45%; }
-    .sig-title { font-size: 10pt; font-weight: bold; color: ${accentColor}; text-transform: uppercase; letter-spacing: 0.5pt; margin-bottom: 4pt; }
-    .sig-date { font-size: 10pt; color: #4b5563; margin-bottom: 40pt; }
-    .sig-line { border-top: 1pt solid #9ca3af; padding-top: 6pt; font-size: 10pt; color: #4b5563; }
-    .footer { margin-top: 40pt; padding-top: 8pt; border-top: 0.5pt solid #e5e7eb; text-align: center; font-size: 9pt; color: #9ca3af; }
+    .sig-title { font-size: 9pt; font-weight: bold; color: ${accentColor}; text-transform: uppercase; letter-spacing: 0.5pt; margin-bottom: 3pt; }
+    .sig-date { font-size: 9pt; color: #4b5563; margin-bottom: 28pt; }
+    .sig-line { border-top: 1pt solid #9ca3af; padding-top: 4pt; font-size: 9pt; color: #4b5563; }
+    .footer { margin-top: 10pt; padding-top: 6pt; border-top: 0.5pt solid #e5e7eb; text-align: center; font-size: 8pt; color: #9ca3af; }
     .print-btn { position: fixed; top: 10px; right: 10px; padding: 8px 16px; background: ${accentColor}; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; z-index: 100; font-family: Arial, sans-serif; }
     @media print { .print-btn { display: none !important; } }
   </style>
