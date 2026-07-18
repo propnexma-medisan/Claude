@@ -57,11 +57,16 @@ function htmlQuitus(cotisation, paiements, copropriete, gestionnaire) {
   };
   const fmtMAD = (n) => (n || 0).toLocaleString('fr-MA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' MAD';
   const allPaiements = paiements || [];
+  // montant_regle = actual cash received for that month (may differ from montant for partial payments)
+  const totalPaye = allPaiements.reduce((s, p) => {
+    if (p.statut === 'Payé') return s + (p.montant_regle !== null && p.montant_regle !== undefined ? p.montant_regle : p.montant || 0);
+    if (p.statut === 'Partiel' && p.montant_regle) return s + p.montant_regle;
+    return s;
+  }, 0);
   const paiementsPayes = allPaiements.filter((p) => p.statut === 'Payé');
-  const totalPaye = paiementsPayes.reduce((s, p) => s + (p.montant || 0), 0);
   const totalAttendu = allPaiements.reduce((s, p) => s + (p.montant || 0), 0);
-  const soldeTotalRestant = totalAttendu - totalPaye;
-  const estSolde = allPaiements.length > 0 && paiementsPayes.length === allPaiements.length;
+  const soldeTotalRestant = Math.max(0, totalAttendu - totalPaye);
+  const estSolde = totalPaye >= totalAttendu && allPaiements.length > 0;
   const nomComplet = `${cotisation.prenom || ''} ${cotisation.nom || ''}`.trim();
   const gestionnaireNom = gestionnaire ? `${gestionnaire.prenom || ''} ${gestionnaire.nom || ''}`.trim() : 'Le Gestionnaire';
   const titreDoc = estSolde ? 'Quitus de Cotisation' : 'Reçu de Paiement Partiel';
@@ -538,14 +543,15 @@ router.put('/cotisations/paiements/:id', authenticate, (req, res) => {
     const existing = db.prepare('SELECT * FROM cotisation_paiements WHERE id = ?').get(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Paiement introuvable' });
 
-    const { statut, date_paiement, mode_paiement, reference, notes } = req.body;
+    const { statut, date_paiement, mode_paiement, reference, notes, montant_regle } = req.body;
     db.prepare(`
       UPDATE cotisation_paiements
       SET statut = COALESCE(?, statut),
           date_paiement = COALESCE(?, date_paiement),
           mode_paiement = COALESCE(?, mode_paiement),
           reference = COALESCE(?, reference),
-          notes = COALESCE(?, notes)
+          notes = COALESCE(?, notes),
+          montant_regle = ?
       WHERE id = ?
     `).run(
       statut || null,
@@ -553,6 +559,7 @@ router.put('/cotisations/paiements/:id', authenticate, (req, res) => {
       mode_paiement || null,
       reference || null,
       notes || null,
+      montant_regle !== undefined ? (montant_regle === '' ? null : parseFloat(montant_regle)) : existing.montant_regle,
       req.params.id
     );
     const updated = db.prepare('SELECT * FROM cotisation_paiements WHERE id = ?').get(req.params.id);

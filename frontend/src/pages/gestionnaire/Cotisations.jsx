@@ -94,14 +94,17 @@ function StatutBadge({ statut }) {
 }
 
 function PaiementCell({ p, onUpdate, disabled }) {
+  const montantAffiche = p.montant_regle !== null && p.montant_regle !== undefined && p.montant_regle !== p.montant;
   return (
     <button
       disabled={disabled}
       onClick={() => onUpdate(p)}
-      className={`w-[60px] h-[56px] rounded-lg border text-center text-xs font-medium flex flex-col items-center justify-center gap-0.5 transition-all hover:opacity-80 ${PAIEMENT_COLORS[p.statut] || 'bg-gray-100 text-gray-500 border-gray-200'} ${disabled ? 'cursor-default' : 'cursor-pointer hover:shadow-sm'}`}
+      title={montantAffiche ? `Reçu: ${p.montant_regle} / Attendu: ${p.montant}` : undefined}
+      className={`w-[60px] h-[56px] rounded-lg border text-center text-xs font-medium flex flex-col items-center justify-center gap-0.5 transition-all hover:opacity-80 ${PAIEMENT_COLORS[p.statut] || 'bg-gray-100 text-gray-500 border-gray-200'} ${disabled ? 'cursor-default' : 'cursor-pointer hover:shadow-sm'} ${montantAffiche ? 'ring-1 ring-orange-400' : ''}`}
     >
       <span className="text-base leading-none">{PAIEMENT_ICONS[p.statut] || '○'}</span>
       <span className="text-[10px] leading-none">{shortMonth(p.mois)}</span>
+      {montantAffiche && <span className="text-[9px] leading-none opacity-70">{p.montant_regle}</span>}
     </button>
   );
 }
@@ -226,6 +229,7 @@ function PaiementModal({ paiement, onClose, onSave }) {
     mode_paiement: paiement.mode_paiement || '',
     reference: paiement.reference || '',
     notes: paiement.notes || '',
+    montant_regle: paiement.montant_regle !== null && paiement.montant_regle !== undefined ? String(paiement.montant_regle) : '',
   });
   const [saving, setSaving] = useState(false);
 
@@ -275,6 +279,16 @@ function PaiementModal({ paiement, onClose, onSave }) {
                 <option key={m} value={m}>{m}</option>
               ))}
             </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Montant réellement reçu (Dhs)
+              <span className="ml-1 text-xs text-gray-400 font-normal">— laisser vide si égal au montant attendu ({fmt(paiement.montant)})</span>
+            </label>
+            <input type="number" min="0" step="0.01" value={form.montant_regle}
+              onChange={(e) => setForm({ ...form, montant_regle: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder={String(paiement.montant)} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Référence</label>

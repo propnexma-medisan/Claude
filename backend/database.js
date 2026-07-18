@@ -397,4 +397,7 @@ try { db.exec('ALTER TABLE ag_points ADD COLUMN tantiemes_contre INTEGER DEFAULT
 try { db.exec('ALTER TABLE ag_points ADD COLUMN tantiemes_abstention INTEGER DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE ag_points ADD COLUMN notes TEXT'); } catch {}
 
+// Montant réellement reçu par mois (distinct du montant attendu, pour paiements partiels ou en avance)
+try { db.exec('ALTER TABLE cotisation_paiements ADD COLUMN montant_regle REAL'); } catch {}
+
 module.exports = db;
