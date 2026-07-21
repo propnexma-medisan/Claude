@@ -1,13 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { users } from '../../api/client';
+import { users, auth } from '../../api/client';
 
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:3001/api');
 
 function sigUrlToPreview(signatureUrl) {
   if (!signatureUrl) return null;
-  // signatureUrl = 'uploads/signatures/sig-xxx.png'
-  // Serve via the /api/uploads path which is always proxied
   return `${API_URL}/${signatureUrl}`;
 }
 
@@ -25,11 +23,29 @@ function GestProfil() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
 
+  // Signature state — hasSignature tracks DB state; sigPreview tracks what to display
   const [sigPreview, setSigPreview] = useState(sigUrlToPreview(user?.signature_url));
+  const [hasSignature, setHasSignature] = useState(!!user?.signature_url);
   const [uploadingSig, setUploadingSig] = useState(false);
   const [sigSuccess, setSigSuccess] = useState(false);
   const [sigError, setSigError] = useState(null);
   const fileRef = useRef(null);
+
+  // Fetch fresh user data on mount to get up-to-date signature_url
+  // (the in-memory user object may be from a session before signature_url was added)
+  useEffect(() => {
+    auth.me().then((fresh) => {
+      if (fresh.signature_url) {
+        setHasSignature(true);
+        setSigPreview(sigUrlToPreview(fresh.signature_url));
+      } else {
+        setHasSignature(false);
+        setSigPreview(null);
+      }
+    }).catch(() => {
+      // Keep whatever we already have from user context
+    });
+  }, []);
 
   const save = async (e) => {
     e.preventDefault();
@@ -59,15 +75,20 @@ function GestProfil() {
     setSigError(null);
     setSigSuccess(false);
     setUploadingSig(true);
+    // Optimistic preview before upload completes
+    const reader = new FileReader();
+    reader.onload = (ev) => setSigPreview(ev.target.result);
+    reader.readAsDataURL(file);
     try {
-      const reader = new FileReader();
-      reader.onload = (ev) => setSigPreview(ev.target.result);
-      reader.readAsDataURL(file);
-
-      await users.uploadSignature(file);
+      const result = await users.uploadSignature(file);
+      setHasSignature(true);
+      // Use the confirmed URL from the server response
+      if (result?.signature_url) setSigPreview(sigUrlToPreview(result.signature_url));
       setSigSuccess(true);
     } catch (err) {
       setSigError(err.message);
+      // Roll back optimistic preview on failure
+      setSigPreview(hasSignature ? sigPreview : null);
     } finally {
       setUploadingSig(false);
       if (fileRef.current) fileRef.current.value = '';
@@ -81,6 +102,7 @@ function GestProfil() {
     try {
       await users.deleteSignature();
       setSigPreview(null);
+      setHasSignature(false);
     } catch (err) {
       setSigError(err.message);
     } finally {
@@ -187,15 +209,35 @@ function GestProfil() {
         <div className="flex items-start gap-6">
           {/* Preview box */}
           <div className="flex-shrink-0">
-            <div className="w-48 h-28 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50 overflow-hidden">
+            <div className="w-48 h-28 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50 overflow-hidden relative">
               {sigPreview ? (
-                <img src={sigPreview} alt="Signature" className="max-h-full max-w-full object-contain p-1" />
+                <img
+                  src={sigPreview}
+                  alt="Signature"
+                  className="max-h-full max-w-full object-contain p-1"
+                  onError={() => {
+                    // Image failed to load (broken URL) — keep hasSignature true so buttons still work
+                    setSigPreview(null);
+                  }}
+                />
+              ) : hasSignature ? (
+                <div className="text-center text-amber-500 px-2">
+                  <svg className="w-7 h-7 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-xs">Signature enregistrée</p>
+                </div>
               ) : (
                 <div className="text-center text-gray-400">
                   <svg className="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                   </svg>
                   <p className="text-xs">Aucune signature</p>
+                </div>
+              )}
+              {uploadingSig && (
+                <div className="absolute inset-0 bg-white/70 flex items-center justify-center rounded-lg">
+                  <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                 </div>
               )}
             </div>
@@ -214,9 +256,9 @@ function GestProfil() {
                 disabled={uploadingSig}
                 className="px-4 py-2 bg-[#1e3a5f] text-white text-sm font-medium rounded-lg hover:bg-[#16304f] disabled:opacity-50 transition-colors"
               >
-                {uploadingSig ? 'Upload…' : sigPreview ? 'Remplacer' : 'Importer une image'}
+                {uploadingSig ? 'Upload…' : hasSignature ? 'Remplacer' : 'Importer une image'}
               </button>
-              {sigPreview && (
+              {hasSignature && (
                 <button
                   type="button"
                   onClick={removeSig}
