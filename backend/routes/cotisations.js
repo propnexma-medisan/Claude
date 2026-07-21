@@ -47,6 +47,17 @@ function toYYYYMM(dateStr) {
 
 // ─── Quitus HTML generator ───────────────────────────────────────────────────
 
+function signatureBase64(signatureUrl) {
+  if (!signatureUrl) return null;
+  try {
+    const filePath = path.join(__dirname, '..', signatureUrl);
+    if (!fs.existsSync(filePath)) return null;
+    const ext = path.extname(filePath).slice(1).toLowerCase();
+    const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'gif' ? 'image/gif' : 'image/png';
+    return `data:${mime};base64,${fs.readFileSync(filePath).toString('base64')}`;
+  } catch { return null; }
+}
+
 function htmlQuitus(cotisation, paiements, copropriete, gestionnaire) {
   const dateDoc = new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' });
   const fmtPeriod = (d) => {
@@ -69,6 +80,7 @@ function htmlQuitus(cotisation, paiements, copropriete, gestionnaire) {
   const estSolde = totalPaye >= totalAttendu && allPaiements.length > 0;
   const nomComplet = `${cotisation.prenom || ''} ${cotisation.nom || ''}`.trim();
   const gestionnaireNom = gestionnaire ? `${gestionnaire.prenom || ''} ${gestionnaire.nom || ''}`.trim() : 'Le Gestionnaire';
+  const sigImg = gestionnaire ? signatureBase64(gestionnaire.signature_url) : null;
   const titreDoc = estSolde ? 'Quitus de Cotisation' : 'Reçu de Paiement Partiel';
   const refPrefix = estSolde ? 'QUI' : 'RPP';
   const accentColor = estSolde ? '#1e3a5f' : '#b45309';
@@ -173,7 +185,9 @@ function htmlQuitus(cotisation, paiements, copropriete, gestionnaire) {
     <div class="sig-block">
       <div class="sig-title">Le Syndic / Gestionnaire</div>
       <div class="sig-date">Fait à ______________________, le ${dateDoc}</div>
-      <div class="sig-line">Signature et cachet</div>
+      ${sigImg
+        ? `<img src="${sigImg}" style="max-height:55pt;max-width:160pt;object-fit:contain;display:block;margin-top:4pt;" alt="signature">`
+        : '<div class="sig-line">Signature et cachet</div>'}
     </div>
     <div class="sig-block" style="text-align:right;">
       <div class="sig-title">Le Copropriétaire</div>
@@ -480,7 +494,7 @@ router.get('/cotisations/:id/quitus', authenticate, (req, res) => {
 
     const paiements = db.prepare('SELECT * FROM cotisation_paiements WHERE cotisation_id = ? ORDER BY mois ASC').all(req.params.id);
     const copropriete = db.prepare('SELECT * FROM coproprietes WHERE id = ?').get(cotisation.copropriete_id);
-    const gestionnaire = db.prepare('SELECT nom, prenom FROM users WHERE id = ?').get(req.user.id);
+    const gestionnaire = db.prepare('SELECT nom, prenom, signature_url FROM users WHERE id = ?').get(req.user.id);
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(htmlQuitus(cotisation, paiements, copropriete, gestionnaire));

@@ -46,7 +46,7 @@ router.post('/login', (req, res) => {
 router.get('/me', authenticate, (req, res) => {
   try {
     const user = db.prepare(`
-      SELECT u.id, u.nom, u.prenom, u.email, u.role, u.copropriete_id, u.lot_id, u.telephone, u.created_at, u.is_active, u.is_membre_bureau,
+      SELECT u.id, u.nom, u.prenom, u.email, u.role, u.copropriete_id, u.lot_id, u.telephone, u.created_at, u.is_active, u.is_membre_bureau, u.signature_url,
              c.nom as copropriete_nom
       FROM users u
       LEFT JOIN coproprietes c ON u.copropriete_id = c.id

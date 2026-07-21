@@ -123,6 +123,17 @@ export const users = {
   delete: (id) => api.delete(`/users/${id}`),
   byResidence: (coproprieteId) => api.get(`/users/by-residence/${coproprieteId}`),
   resendCredentials: (id) => api.post(`/users/${id}/resend-credentials`, {}),
+  uploadSignature: (file) => {
+    const form = new FormData();
+    form.append('signature', file);
+    const token = getToken();
+    return fetch(`${BASE_URL}/users/upload-signature`, {
+      method: 'POST',
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: form,
+    }).then((r) => r.ok ? r.json() : r.json().then((e) => Promise.reject(new Error(e.error || 'Erreur upload'))));
+  },
+  deleteSignature: () => api.delete('/users/upload-signature'),
 };
 
 // Tickets

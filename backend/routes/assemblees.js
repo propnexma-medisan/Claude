@@ -1,9 +1,22 @@
 const express = require('express');
 const router = express.Router();
+const path = require('path');
+const fs = require('fs');
 const db = require('../database');
 const { requireRole } = require('../middleware/auth');
 const { canGestionnaireAccessResidence } = require('../utils/access');
 const { sendConvocation } = require('../services/email');
+
+function signatureBase64(signatureUrl) {
+  if (!signatureUrl) return null;
+  try {
+    const filePath = path.join(__dirname, '..', signatureUrl);
+    if (!fs.existsSync(filePath)) return null;
+    const ext = path.extname(filePath).slice(1).toLowerCase();
+    const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'gif' ? 'image/gif' : 'image/png';
+    return `data:${mime};base64,${fs.readFileSync(filePath).toString('base64')}`;
+  } catch { return null; }
+}
 
 function checkAccess(req, copropriete_id) {
   if (req.user.role === 'admin') return true;
@@ -321,8 +334,10 @@ router.get('/:id/feuille-emargement', (req, res) => {
     `).all(req.params.id, ag.copropriete_id);
 
     const totalT = lots.reduce((s, l) => s + (l.tantiemes || 0), 0);
+    const gest = db.prepare('SELECT nom, prenom, signature_url FROM users WHERE id = ?').get(req.user.id);
+    const sigImg = signatureBase64(gest?.signature_url);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(htmlFeuilleEmargement(ag, lots, totalT));
+    res.send(htmlFeuilleEmargement(ag, lots, totalT, gest, sigImg));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -351,8 +366,10 @@ router.get('/:id/pv', (req, res) => {
     `).all(req.params.id);
 
     db.prepare('UPDATE assemblees SET pv_genere = 1 WHERE id = ?').run(req.params.id);
+    const gest = db.prepare('SELECT nom, prenom, signature_url FROM users WHERE id = ?').get(req.user.id);
+    const sigImg = signatureBase64(gest?.signature_url);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(htmlPV(ag, points, presences));
+    res.send(htmlPV(ag, points, presences, gest, sigImg));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -367,7 +384,7 @@ function fmtDate(d) {
   } catch { return d; }
 }
 
-function htmlFeuilleEmargement(ag, lots, totalT) {
+function htmlFeuilleEmargement(ag, lots, totalT, gest, sigImg) {
   const rows = lots.map((l, i) => `
     <tr>
       <td>${i + 1}</td>
@@ -414,14 +431,17 @@ ${rows}
 </tbody>
 </table>
 <div class="sigs">
+  <div class="sig">
+    ${sigImg ? `<img src="${sigImg}" style="max-height:50px;max-width:140px;object-fit:contain;display:block;margin-bottom:4px;" alt="signature">` : ''}
+    <p>Le Syndic / Gestionnaire${gest ? ` — ${gest.prenom || ''} ${gest.nom || ''}`.trim() : ''}</p>
+  </div>
   <div class="sig"><p>Le Président de séance</p></div>
   <div class="sig"><p>Le Secrétaire</p></div>
-  <div class="sig"><p>Le Scrutateur</p></div>
 </div>
 </body></html>`;
 }
 
-function htmlPV(ag, points, presences) {
+function htmlPV(ag, points, presences, gest, sigImg) {
   const presents = presences.filter((p) => p.statut === 'Présent' || p.statut === 'Procuration');
   const tantiemesPresents = presents.reduce((s, p) => s + (p.tantiemes || 0), 0);
   const totalT = ag.total_tantiemes || presences.reduce((s, p) => s + (p.tantiemes || 0), 0);
@@ -527,9 +547,12 @@ ${pointsHtml || '<p style="color:#6b7280;font-size:12px">Aucun point enregistré
 </p>
 
 <div class="sigs">
+  <div class="sig">
+    ${sigImg ? `<img src="${sigImg}" style="max-height:55px;max-width:150px;object-fit:contain;display:block;margin-bottom:4px;" alt="signature">` : '<div style="height:55px"></div>'}
+    <div class="sig-line">Le Syndic / Gestionnaire${gest ? ` — ${gest.prenom || ''} ${gest.nom || ''}`.trim() : ''}</div>
+  </div>
   <div class="sig"><div class="sig-line">Le Président de séance</div></div>
   <div class="sig"><div class="sig-line">Le Secrétaire</div></div>
-  <div class="sig"><div class="sig-line">Le Scrutateur</div></div>
 </div>
 
 <p style="text-align:center;margin-top:20px;font-size:10px;color:#9ca3af">

@@ -1,11 +1,29 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const db = require('../database');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { sendBienvenue } = require('../services/email');
 const { canGestionnaireAccessResidence, syncGestionnaireResidences, getGestionnaireResidences } = require('../utils/access');
 
 const router = express.Router();
+
+const signaturesDir = path.join(__dirname, '../uploads/signatures');
+if (!fs.existsSync(signaturesDir)) fs.mkdirSync(signaturesDir, { recursive: true });
+const sigStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, signaturesDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.png';
+    cb(null, `sig-${req.user.id}-${Date.now()}${ext}`);
+  },
+});
+const uploadSig = multer({
+  storage: sigStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => cb(null, file.mimetype.startsWith('image/')),
+});
 
 // GET /api/users — admin only, list all users with copropriete info
 router.get('/', authenticate, requireRole('admin'), (req, res) => {
@@ -268,6 +286,47 @@ router.post('/:id/resend-credentials', authenticate, requireRole('gestionnaire',
     });
 
     res.json({ message: 'Identifiants renvoyés avec succès' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/users/upload-signature — gestionnaire or admin uploads their own signature+stamp image
+router.post('/upload-signature', authenticate, uploadSig.single('signature'), (req, res) => {
+  try {
+    if (req.user.role !== 'gestionnaire' && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+    if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu' });
+
+    // Delete old signature file if it exists
+    const existing = db.prepare('SELECT signature_url FROM users WHERE id = ?').get(req.user.id);
+    if (existing?.signature_url) {
+      const oldPath = path.join(__dirname, '..', existing.signature_url);
+      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    }
+
+    const relPath = `uploads/signatures/${req.file.filename}`;
+    db.prepare('UPDATE users SET signature_url = ? WHERE id = ?').run(relPath, req.user.id);
+    res.json({ signature_url: relPath });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/users/upload-signature — remove signature
+router.delete('/upload-signature', authenticate, (req, res) => {
+  try {
+    if (req.user.role !== 'gestionnaire' && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+    const existing = db.prepare('SELECT signature_url FROM users WHERE id = ?').get(req.user.id);
+    if (existing?.signature_url) {
+      const oldPath = path.join(__dirname, '..', existing.signature_url);
+      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    }
+    db.prepare('UPDATE users SET signature_url = NULL WHERE id = ?').run(req.user.id);
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

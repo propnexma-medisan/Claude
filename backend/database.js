@@ -400,4 +400,7 @@ try { db.exec('ALTER TABLE ag_points ADD COLUMN notes TEXT'); } catch {}
 // Montant réellement reçu par mois (distinct du montant attendu, pour paiements partiels ou en avance)
 try { db.exec('ALTER TABLE cotisation_paiements ADD COLUMN montant_regle REAL'); } catch {}
 
+// Signature + cachet numérique du gestionnaire
+try { db.exec('ALTER TABLE users ADD COLUMN signature_url TEXT'); } catch {}
+
 module.exports = db;
