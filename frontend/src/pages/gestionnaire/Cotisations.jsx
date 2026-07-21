@@ -1,5 +1,5 @@
 import { formatMAD } from '../../utils/currency';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { cotisations, relances, users } from '../../api/client';
 
@@ -631,6 +631,164 @@ function NewCotisationModal({ coproprieteId, coproUsers, onClose, onSave }) {
   );
 }
 
+// ─── Modal: Virement groupé ───────────────────────────────────────────────────
+function VirementModal({ detail, onClose, onSave }) {
+  const unpaid = useMemo(() =>
+    (detail.paiements || [])
+      .filter((p) => p.statut !== 'Payé')
+      .sort((a, b) => a.mois.localeCompare(b.mois)),
+    [detail.paiements]
+  );
+
+  const today = new Date().toISOString().slice(0, 10);
+  const [montant, setMontant] = useState('');
+  const [datePaiement, setDatePaiement] = useState(today);
+  const [modePaiement, setModePaiement] = useState('Virement');
+  const [reference, setReference] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const preview = useMemo(() => {
+    const total = parseFloat(montant);
+    if (!total || total <= 0 || unpaid.length === 0) return null;
+    let restant = total;
+    const covered = [];
+    for (const p of unpaid) {
+      if (restant <= 0) break;
+      if (restant >= p.montant) {
+        covered.push({ p, type: 'full' });
+        restant = Math.round((restant - p.montant) * 100) / 100;
+      } else {
+        covered.push({ p, type: 'partial', amount: Math.round(restant * 100) / 100 });
+        restant = 0;
+      }
+    }
+    return { covered, reste: Math.round(restant * 100) / 100 };
+  }, [montant, unpaid]);
+
+  async function handleSave() {
+    if (!montant || parseFloat(montant) <= 0) return;
+    setSaving(true);
+    try {
+      await onSave({ montant_total: parseFloat(montant), date_paiement: datePaiement, mode_paiement: modePaiement, reference });
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl max-h-[90vh] flex flex-col">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+          <div>
+            <h3 className="font-semibold text-gray-800">Saisir un virement</h3>
+            <p className="text-xs text-gray-400 mt-0.5">{detail.prenom} {detail.nom} · {fmt(detail.montant_mensuel)}/mois</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4 overflow-y-auto">
+          {unpaid.length === 0 ? (
+            <div className="text-center py-8 text-green-600">
+              <svg className="w-10 h-10 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <p className="font-medium">Tous les mois sont déjà réglés</p>
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Montant reçu (Dhs)</label>
+                <input
+                  type="number" min="0" step="0.01" value={montant} autoFocus
+                  onChange={(e) => setMontant(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg font-semibold"
+                  placeholder="Ex : 6000"
+                />
+                {unpaid.length > 0 && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    {unpaid.length} mois impayé{unpaid.length > 1 ? 's' : ''} · montant attendu : {fmt(detail.montant_mensuel)}/mois
+                  </p>
+                )}
+              </div>
+
+              {/* Preview */}
+              {preview && (
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-2">
+                  <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2">Répartition automatique</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {preview.covered.map(({ p, type, amount }) => (
+                      <div
+                        key={p.id}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-medium flex flex-col items-center gap-0.5 ${
+                          type === 'full'
+                            ? 'bg-green-100 text-green-700 border border-green-200'
+                            : 'bg-orange-100 text-orange-700 border border-orange-200'
+                        }`}
+                      >
+                        <span>{shortMonth(p.mois)}</span>
+                        <span className="font-bold">{type === 'full' ? '✓' : `${amount} Dhs`}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="pt-2 border-t border-blue-100 text-xs text-blue-800 space-y-0.5">
+                    <p>
+                      <span className="font-semibold">{preview.covered.filter((c) => c.type === 'full').length} mois</span> soldés intégralement
+                      {preview.covered.some((c) => c.type === 'partial') && (
+                        <span className="ml-1 text-orange-600">+ 1 mois partiel</span>
+                      )}
+                    </p>
+                    {preview.reste > 0 && (
+                      <p className="text-amber-600 font-medium">⚠ Excédent de {fmt(preview.reste)} — tous les mois impayés sont couverts</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Date de réception</label>
+                  <input type="date" value={datePaiement} onChange={(e) => setDatePaiement(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Mode</label>
+                  <select value={modePaiement} onChange={(e) => setModePaiement(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    {['Virement', 'Chèque', 'Espèces', 'Prélèvement', 'Carte bancaire'].map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Référence <span className="text-gray-400 font-normal">(optionnel)</span></label>
+                <input type="text" value={reference} onChange={(e) => setReference(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="N° de virement…" />
+              </div>
+            </>
+          )}
+        </div>
+
+        {unpaid.length > 0 && (
+          <div className="px-6 py-4 border-t border-gray-100 flex gap-3 justify-end flex-shrink-0">
+            <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-200 rounded-lg hover:bg-gray-50">
+              Annuler
+            </button>
+            <button onClick={handleSave} disabled={saving || !montant || parseFloat(montant) <= 0}
+              className="px-5 py-2 text-sm bg-[#1e3a5f] text-white rounded-lg hover:bg-[#16304f] disabled:opacity-50 font-medium">
+              {saving ? 'Enregistrement…' : `Enregistrer ${montant ? fmt(parseFloat(montant) || 0) : ''}`}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── CotisationRow ────────────────────────────────────────────────────────────
 function CotisationRow({ c, isSelected, onClick }) {
   const days = daysRemaining(c.date_fin);
@@ -682,6 +840,7 @@ function CotisationDetail({ cotisationId, coproprieteId, onRefresh, onDelete }) 
   const [saving, setSaving] = useState(false);
   const [sendingQuitus, setSendingQuitus] = useState(false);
   const [quitusSent, setQuitusSent] = useState(false);
+  const [showVirement, setShowVirement] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -701,6 +860,12 @@ function CotisationDetail({ cotisationId, coproprieteId, onRefresh, onDelete }) 
   async function handleRelanceSave(data) {
     await relances.create(data);
     load();
+  }
+
+  async function handleVirement(data) {
+    await cotisations.virementGroupe(cotisationId, data);
+    load();
+    onRefresh();
   }
 
   async function handleExtend() {
@@ -859,15 +1024,28 @@ function CotisationDetail({ cotisationId, coproprieteId, onRefresh, onDelete }) 
       <div className="px-6 py-5 border-b border-gray-100">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-gray-800">Paiements</h3>
-          <div className="flex gap-3 text-xs text-gray-500">
-            <span>{fmt(totalPaye)} payé</span>
-            <span className="text-gray-300">|</span>
-            <span>{fmt(totalAttendu)} total</span>
+          <div className="flex items-center gap-3">
+            <div className="flex gap-3 text-xs text-gray-500">
+              <span>{fmt(totalPaye)} payé</span>
+              <span className="text-gray-300">|</span>
+              <span>{fmt(totalAttendu)} total</span>
+              {impayes > 0 && (
+                <>
+                  <span className="text-gray-300">|</span>
+                  <span className="text-red-500">{impayes} impayé(s)</span>
+                </>
+              )}
+            </div>
             {impayes > 0 && (
-              <>
-                <span className="text-gray-300">|</span>
-                <span className="text-red-500">{impayes} impayé(s)</span>
-              </>
+              <button
+                onClick={() => setShowVirement(true)}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-[#1e3a5f] text-white rounded-lg hover:bg-[#16304f] transition-colors font-medium"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Saisir un virement
+              </button>
             )}
           </div>
         </div>
@@ -964,6 +1142,13 @@ function CotisationDetail({ cotisationId, coproprieteId, onRefresh, onDelete }) 
           cotisation={detail}
           onClose={() => setShowRelanceModal(false)}
           onSave={handleRelanceSave}
+        />
+      )}
+      {showVirement && (
+        <VirementModal
+          detail={detail}
+          onClose={() => setShowVirement(false)}
+          onSave={handleVirement}
         />
       )}
     </div>

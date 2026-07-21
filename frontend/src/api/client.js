@@ -223,6 +223,7 @@ export const cotisations = {
   getAlertes: (coproprieteId) => api.get(`/cotisations/alertes?copropriete_id=${coproprieteId}`),
   getQuitus: (id) => api.getHtml(`/cotisations/${id}/quitus`),
   sendQuitus: (id) => api.post(`/cotisations/${id}/send-quitus`, {}),
+  virementGroupe: (id, data) => api.post(`/cotisations/${id}/virement`, data),
   uploadPreuve: (cotisationId, file) => {
     const form = new FormData();
     form.append('file', file);

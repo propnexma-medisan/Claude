@@ -548,6 +548,59 @@ router.post('/cotisations/:id/send-quitus', authenticate, async (req, res) => {
   }
 });
 
+// POST /api/cotisations/:id/virement — distribute a lump-sum payment across unpaid months
+router.post('/cotisations/:id/virement', authenticate, (req, res) => {
+  try {
+    if (req.user.role === 'copropietaire' || req.user.role === 'membre_bureau') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+    const cotisation = db.prepare('SELECT * FROM cotisations WHERE id = ?').get(req.params.id);
+    if (!cotisation) return res.status(404).json({ error: 'Cotisation introuvable' });
+
+    const { montant_total, date_paiement, mode_paiement, reference, notes } = req.body;
+    const total = parseFloat(montant_total);
+    if (!total || total <= 0) return res.status(400).json({ error: 'Montant requis et doit être > 0' });
+
+    // Non-paid months in chronological order
+    const nonPaies = db.prepare(`
+      SELECT * FROM cotisation_paiements
+      WHERE cotisation_id = ? AND statut != 'Payé'
+      ORDER BY mois ASC
+    `).all(req.params.id);
+
+    if (nonPaies.length === 0) return res.status(400).json({ error: 'Aucun mois impayé à couvrir' });
+
+    const updateStmt = db.prepare(`
+      UPDATE cotisation_paiements
+      SET statut = ?, montant_regle = ?, date_paiement = ?, mode_paiement = ?, reference = ?, notes = ?
+      WHERE id = ?
+    `);
+
+    let restant = total;
+    let nbUpdated = 0;
+
+    const doUpdates = db.transaction(() => {
+      for (const p of nonPaies) {
+        if (restant <= 0) break;
+        if (restant >= p.montant) {
+          updateStmt.run('Payé', p.montant, date_paiement || null, mode_paiement || null, reference || null, notes || null, p.id);
+          restant = Math.round((restant - p.montant) * 100) / 100;
+        } else {
+          updateStmt.run('Partiel', Math.round(restant * 100) / 100, date_paiement || null, mode_paiement || null, reference || null, notes || null, p.id);
+          restant = 0;
+        }
+        nbUpdated++;
+      }
+    });
+    doUpdates();
+
+    const paiements = db.prepare('SELECT * FROM cotisation_paiements WHERE cotisation_id = ? ORDER BY mois ASC').all(req.params.id);
+    res.json({ updated: nbUpdated, reste: Math.round(restant * 100) / 100, paiements });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── PAIEMENTS ───────────────────────────────────────────────────────────────
 
 // PUT /api/cotisations/paiements/:id
