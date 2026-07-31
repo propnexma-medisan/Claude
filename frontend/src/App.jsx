@@ -33,6 +33,7 @@ import Fournisseurs from './pages/gestionnaire/Fournisseurs';
 import Recouvrement from './pages/gestionnaire/Recouvrement';
 import AG from './pages/gestionnaire/AG';
 import GestProfil from './pages/gestionnaire/GestProfil';
+import RapportCotisations from './pages/gestionnaire/RapportCotisations';
 
 // Copropriétaire pages
 import MonProfil from './pages/copropietaire/MonProfil';
@@ -107,6 +108,7 @@ function App() {
         <Route path="recouvrement" element={<Recouvrement />} />
         <Route path="ag" element={<AG />} />
         <Route path="profil" element={<GestProfil />} />
+        <Route path="rapport" element={<RapportCotisations />} />
       </Route>
 
       {/* Membre bureau syndical */}

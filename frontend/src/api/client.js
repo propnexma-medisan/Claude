@@ -263,6 +263,10 @@ export const recouvrement = {
   sendEmail: (data) => api.post('/recouvrement/send-email', data),
 };
 
+export const rapports = {
+  getCotisations: (coproprieteId) => api.get(`/rapports/cotisations?copropriete_id=${coproprieteId}`),
+};
+
 export const adminApi = {
   getStats: () => api.get('/admin/stats'),
   getDashboard: () => api.get('/admin/dashboard'),
