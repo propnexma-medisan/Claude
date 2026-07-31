@@ -371,4 +371,122 @@ router.get('/dashboard', (req, res) => {
   }
 });
 
+// GET /api/admin/rapport-cotisations?copropriete_id=X  (ou ?nom=Linaz)
+// Retourne le rapport complet des cotisations par lot pour une résidence
+router.get('/rapport-cotisations', (req, res) => {
+  try {
+    const { copropriete_id, nom } = req.query;
+
+    // Trouver la résidence
+    let copropriete;
+    if (copropriete_id) {
+      copropriete = db.prepare('SELECT * FROM coproprietes WHERE id = ?').get(copropriete_id);
+    } else if (nom) {
+      copropriete = db.prepare("SELECT * FROM coproprietes WHERE nom LIKE ?").get(`%${nom}%`);
+    } else {
+      return res.status(400).json({ error: 'Paramètre copropriete_id ou nom requis' });
+    }
+
+    if (!copropriete) return res.status(404).json({ error: 'Résidence introuvable' });
+
+    const currentYear = String(new Date().getFullYear());
+    const currentMonth = new Date().toISOString().slice(0, 7);
+
+    // Tous les copropriétaires de cette résidence avec leur lot + cotisation active
+    const copropietaires = db.prepare(`
+      SELECT
+        u.id, u.nom, u.prenom, u.email, u.telephone, u.is_active,
+        l.id as lot_id, l.numero as lot_numero, l.type as lot_type, l.tantiemes,
+        cot.id as cotisation_id,
+        cot.montant_mensuel,
+        cot.date_debut, cot.date_fin, cot.statut as cotisation_statut,
+        cot.notes as cotisation_notes
+      FROM users u
+      LEFT JOIN lots l ON l.id = u.lot_id
+      LEFT JOIN cotisations cot ON cot.user_id = u.id
+        AND cot.copropriete_id = ?
+        AND cot.statut IN ('Active','Expirée')
+        AND cot.id = (
+          SELECT id FROM cotisations
+          WHERE user_id = u.id AND copropriete_id = ?
+            AND statut IN ('Active','Expirée')
+          ORDER BY CASE statut WHEN 'Active' THEN 0 ELSE 1 END, date_fin DESC
+          LIMIT 1
+        )
+      WHERE u.copropriete_id = ? AND u.role = 'copropietaire'
+      ORDER BY l.numero ASC
+    `).all(copropriete.id, copropriete.id, copropriete.id);
+
+    // Pour chaque copropriétaire, enrichir avec les stats paiements
+    const enriched = copropietaires.map(cp => {
+      let paiementsStats = { total_mois: 0, mois_payes: 0, mois_en_retard: 0, mois_en_attente: 0, total_attendu: 0, total_encaisse: 0 };
+
+      if (cp.cotisation_id) {
+        const paiements = db.prepare(`
+          SELECT statut,
+            SUM(montant) as montant_sum,
+            SUM(COALESCE(montant_regle, CASE WHEN statut = 'Payé' THEN montant ELSE 0 END)) as encaisse_sum,
+            COUNT(*) as nb
+          FROM cotisation_paiements
+          WHERE cotisation_id = ?
+          GROUP BY statut
+        `).all(cp.cotisation_id);
+
+        paiements.forEach(p => {
+          paiementsStats.total_mois += p.nb;
+          paiementsStats.total_attendu += p.montant_sum || 0;
+          if (p.statut === 'Payé') { paiementsStats.mois_payes += p.nb; paiementsStats.total_encaisse += p.encaisse_sum || 0; }
+          else if (p.statut === 'En retard') { paiementsStats.mois_en_retard += p.nb; }
+          else if (p.statut === 'En attente') { paiementsStats.mois_en_attente += p.nb; }
+          else if (p.statut === 'Partiel') { paiementsStats.total_encaisse += p.encaisse_sum || 0; }
+        });
+      }
+
+      const impaye = Math.max(0, paiementsStats.total_attendu - paiementsStats.total_encaisse);
+      const taux_recouvrement = paiementsStats.total_attendu > 0
+        ? Math.round((paiementsStats.total_encaisse / paiementsStats.total_attendu) * 100)
+        : null;
+
+      return {
+        id: cp.id,
+        nom: cp.nom,
+        prenom: cp.prenom,
+        email: cp.email,
+        telephone: cp.telephone,
+        is_active: cp.is_active,
+        lot: cp.lot_numero ? { id: cp.lot_id, numero: cp.lot_numero, type: cp.lot_type, tantiemes: cp.tantiemes } : null,
+        cotisation: cp.cotisation_id ? {
+          id: cp.cotisation_id,
+          montant_mensuel: cp.montant_mensuel,
+          date_debut: cp.date_debut,
+          date_fin: cp.date_fin,
+          statut: cp.cotisation_statut,
+        } : null,
+        paiements: paiementsStats,
+        impaye,
+        taux_recouvrement,
+      };
+    });
+
+    // Totaux résidence
+    const totaux = {
+      nb_copropietaires: enriched.length,
+      nb_avec_cotisation: enriched.filter(c => c.cotisation).length,
+      total_mensuel: enriched.reduce((s, c) => s + (c.cotisation?.montant_mensuel || 0), 0),
+      total_annuel_attendu: enriched.reduce((s, c) => s + (c.paiements.total_attendu || 0), 0),
+      total_encaisse: enriched.reduce((s, c) => s + (c.paiements.total_encaisse || 0), 0),
+      total_impaye: enriched.reduce((s, c) => s + (c.impaye || 0), 0),
+    };
+
+    res.json({
+      residence: copropriete,
+      totaux,
+      copropietaires: enriched,
+      genere_le: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
