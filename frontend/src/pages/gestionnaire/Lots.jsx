@@ -127,7 +127,7 @@ function Lots() {
 
   const sorted = [...list].sort((a, b) => {
     let va, vb;
-    if (sortCol === 'numero') { va = a.numero || ''; vb = b.numero || ''; }
+    if (sortCol === 'numero') { va = a.numero || ''; vb = b.numero || ''; return sortDir === 'asc' ? va.localeCompare(vb, 'fr', { numeric: true }) : vb.localeCompare(va, 'fr', { numeric: true }); }
     else if (sortCol === 'type') { va = a.type || ''; vb = b.type || ''; }
     else if (sortCol === 'surface') { va = parseFloat(a.surface) || 0; vb = parseFloat(b.surface) || 0; return sortDir === 'asc' ? va - vb : vb - va; }
     else if (sortCol === 'tantiemes') { va = parseFloat(a.tantiemes) || 0; vb = parseFloat(b.tantiemes) || 0; return sortDir === 'asc' ? va - vb : vb - va; }
