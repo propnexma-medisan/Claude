@@ -121,6 +121,17 @@ router.get('/:coproprieteId', authenticate, (req, res) => {
     const total_cot_a_collecter = cotisationsList.reduce((s, c) => s + c.cot_a_collecter, 0);
     const total_depenses_realisees = depensesList.reduce((s, d) => s + d.montant, 0);
 
+    // Year-specific KPIs (recettes, attendu, impayé for the selected year only)
+    const kpis_annee = db.prepare(`
+      SELECT
+        COALESCE(SUM(CASE WHEN cp.statut = 'Payé' THEN cp.montant ELSE 0 END), 0) as paye_annee,
+        COALESCE(SUM(cp.montant), 0) as attendu_annee,
+        COALESCE(SUM(CASE WHEN cp.statut != 'Payé' AND cp.mois <= ? THEN cp.montant ELSE 0 END), 0) as impaye_annee
+      FROM cotisation_paiements cp
+      JOIN cotisations c ON cp.cotisation_id = c.id
+      WHERE c.copropriete_id = ? AND strftime('%Y', cp.mois || '-01') = ?
+    `).get(currentMonth, coproprieteId, String(annee));
+
     // Monthly breakdown for chart
     const recettes_par_mois = db.prepare(`
       SELECT cp.mois, COALESCE(SUM(cp.montant), 0) as recettes
@@ -174,6 +185,10 @@ router.get('/:coproprieteId', authenticate, (req, res) => {
       total_cot_impaye,
       total_cot_a_collecter,
       total_depenses_realisees,
+      // Year-specific KPIs
+      total_cot_paye_annee: kpis_annee.paye_annee,
+      total_cot_attendu_annee: kpis_annee.attendu_annee,
+      total_cot_impaye_annee: kpis_annee.impaye_annee,
       recettes_par_mois,
       depenses_par_mois,
       depenses_par_categorie,

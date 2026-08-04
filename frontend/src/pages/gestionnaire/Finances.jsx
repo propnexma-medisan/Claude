@@ -118,11 +118,11 @@ function Finances() {
     return <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">Erreur : {error}</div>;
   }
 
-  const recettes = data?.total_cot_paye || 0;
+  const recettes = data?.total_cot_paye_annee ?? data?.total_cot_paye ?? 0;
   const depenses = data?.total_depenses_realisees || 0;
-  const impaye = data?.total_cot_impaye || 0;
+  const impaye = data?.total_cot_impaye_annee ?? data?.total_cot_impaye ?? 0;
   const solde = recettes - depenses;
-  const attendu = data?.total_cot_attendu || 0;
+  const attendu = data?.total_cot_attendu_annee ?? data?.total_cot_attendu ?? 0;
   const taux = attendu > 0 ? Math.round((recettes / attendu) * 100) : 0;
 
   const monthlyData = buildMonthlyData(data?.recettes_par_mois, data?.depenses_par_mois, annee);
