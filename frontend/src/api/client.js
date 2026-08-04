@@ -253,6 +253,17 @@ export const fournisseurs = {
   createContrat: (fournisseurId, data) => api.post(`/fournisseurs/${fournisseurId}/contrats`, data),
   updateContrat: (id, data) => api.put(`/fournisseurs/contrats/${id}`, data),
   deleteContrat: (id) => api.delete(`/fournisseurs/contrats/${id}`),
+  uploadDocument: (contratId, file) => {
+    const form = new FormData();
+    form.append('document', file);
+    const token = getToken();
+    return fetch(`${BASE_URL}/fournisseurs/contrats/${contratId}/upload`, {
+      method: 'POST',
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: form,
+    }).then((r) => r.ok ? r.json() : r.json().then((e) => Promise.reject(new Error(e.error || 'Erreur upload'))));
+  },
+  deleteDocument: (contratId) => api.delete(`/fournisseurs/contrats/${contratId}/document`),
 };
 
 export const recouvrement = {

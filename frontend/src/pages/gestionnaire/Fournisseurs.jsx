@@ -49,6 +49,7 @@ function Fournisseurs() {
   const [contratFournisseurId, setContratFournisseurId] = useState(null);
   const [savingContrat, setSavingContrat] = useState(false);
   const [contratError, setContratError] = useState(null);
+  const [uploadingDoc, setUploadingDoc] = useState(null);
 
   const load = () => {
     if (!selectedCoproId) { setLoading(false); return; }
@@ -158,6 +159,39 @@ function Fournisseurs() {
     setList((l) => l.map((x) => x.id === fournisseurId ? { ...x, nb_contrats: Math.max(0, (x.nb_contrats || 1) - 1) } : x));
   };
 
+  const handleDocUpload = async (contratId, fournisseurId, file) => {
+    if (!file) return;
+    setUploadingDoc(contratId);
+    try {
+      const result = await fournisseursApi.uploadDocument(contratId, file);
+      setContrats((p) => ({
+        ...p,
+        [fournisseurId]: (p[fournisseurId] || []).map((c) =>
+          c.id === contratId ? { ...c, document_url: result.document_url } : c
+        ),
+      }));
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setUploadingDoc(null);
+    }
+  };
+
+  const handleDocDelete = async (contratId, fournisseurId) => {
+    if (!confirm('Supprimer le document PDF attaché ?')) return;
+    try {
+      await fournisseursApi.deleteDocument(contratId);
+      setContrats((p) => ({
+        ...p,
+        [fournisseurId]: (p[fournisseurId] || []).map((c) =>
+          c.id === contratId ? { ...c, document_url: null } : c
+        ),
+      }));
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   if (!selectedCoproId) {
     return <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-yellow-700">Aucune résidence assignée.</div>;
   }
@@ -257,7 +291,7 @@ function Fournisseurs() {
                   ) : (
                     <div className="space-y-2">
                       {(contrats[f.id] || []).map((c) => (
-                        <div key={c.id} className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 flex items-center gap-3">
+                        <div key={c.id} className="bg-white border border-gray-100 rounded-lg px-3 py-2.5 flex items-start gap-3">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="text-sm font-medium text-gray-800">{c.titre}</p>
@@ -269,6 +303,55 @@ function Fournisseurs() {
                               {c.date_debut && <span>Du {c.date_debut}</span>}
                               {c.date_fin && <span>au {c.date_fin}</span>}
                               {c.notes && <span className="truncate max-w-[200px]">{c.notes}</span>}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1.5">
+                              {c.document_url ? (
+                                <>
+                                  <a
+                                    href={c.document_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                                  >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    Voir le PDF
+                                  </a>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleDocDelete(c.id, f.id); }}
+                                    className="text-xs text-red-400 hover:text-red-600"
+                                  >
+                                    Retirer
+                                  </button>
+                                </>
+                              ) : (
+                                <label
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 cursor-pointer"
+                                >
+                                  {uploadingDoc === c.id ? (
+                                    <span className="flex items-center gap-1">
+                                      <div className="animate-spin w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full" />
+                                      Envoi...
+                                    </span>
+                                  ) : (
+                                    <>
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                      </svg>
+                                      Joindre PDF
+                                    </>
+                                  )}
+                                  <input
+                                    type="file"
+                                    accept="application/pdf"
+                                    className="hidden"
+                                    onChange={(e) => { if (e.target.files[0]) handleDocUpload(c.id, f.id, e.target.files[0]); e.target.value = ''; }}
+                                  />
+                                </label>
+                              )}
                             </div>
                           </div>
                           <div className="flex gap-1 flex-shrink-0">

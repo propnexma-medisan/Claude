@@ -1,7 +1,20 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const { canGestionnaireAccessResidence } = require('../utils/access');
+
+const uploadDir = path.join(__dirname, '../uploads');
+const contratUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadDir),
+    filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname.replace(/\s+/g, '_')),
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => cb(null, file.mimetype === 'application/pdf'),
+});
 
 function canAccess(user, coproprieteId) {
   if (user.role === 'admin') return true;
@@ -164,6 +177,45 @@ router.put('/contrats/:id', (req, res) => {
 
     const updated = db.prepare('SELECT * FROM contrats WHERE id = ?').get(req.params.id);
     res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/fournisseurs/contrats/:id/upload
+router.post('/contrats/:id/upload', contratUpload.single('document'), (req, res) => {
+  try {
+    const existing = db.prepare('SELECT * FROM contrats WHERE id = ?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Contrat non trouvé' });
+    const fournisseur = db.prepare('SELECT * FROM fournisseurs WHERE id = ?').get(existing.fournisseur_id);
+    if (!canAccess(req.user, fournisseur.copropriete_id)) return res.status(403).json({ error: 'Accès refusé' });
+    if (!req.file) return res.status(400).json({ error: 'Aucun fichier PDF reçu' });
+
+    if (existing.document_url) {
+      try { fs.unlinkSync(path.join(uploadDir, path.basename(existing.document_url))); } catch {}
+    }
+
+    const document_url = `/api/uploads/${req.file.filename}`;
+    db.prepare('UPDATE contrats SET document_url = ? WHERE id = ?').run(document_url, req.params.id);
+    res.json({ document_url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/fournisseurs/contrats/:id/document
+router.delete('/contrats/:id/document', (req, res) => {
+  try {
+    const existing = db.prepare('SELECT * FROM contrats WHERE id = ?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Contrat non trouvé' });
+    const fournisseur = db.prepare('SELECT * FROM fournisseurs WHERE id = ?').get(existing.fournisseur_id);
+    if (!canAccess(req.user, fournisseur.copropriete_id)) return res.status(403).json({ error: 'Accès refusé' });
+
+    if (existing.document_url) {
+      try { fs.unlinkSync(path.join(uploadDir, path.basename(existing.document_url))); } catch {}
+    }
+    db.prepare('UPDATE contrats SET document_url = NULL WHERE id = ?').run(req.params.id);
+    res.json({ message: 'Document supprimé' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

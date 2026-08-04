@@ -313,6 +313,9 @@ try {
   )`);
 } catch {}
 
+// Document PDF attaché à un contrat
+try { db.exec('ALTER TABLE contrats ADD COLUMN document_url TEXT'); } catch {}
+
 // Link depenses to fournisseurs
 try { db.exec('ALTER TABLE depenses ADD COLUMN fournisseur_id INTEGER REFERENCES fournisseurs(id) ON DELETE SET NULL'); } catch {}
 
