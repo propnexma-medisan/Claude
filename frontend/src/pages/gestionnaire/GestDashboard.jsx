@@ -114,7 +114,7 @@ function GestDashboard() {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-xs font-medium text-gray-500">Cotisations collectées</p>
-              <p className="mt-1 text-xl font-bold text-green-600">{fmt(fin?.total_cot_paye)}</p>
+              <p className="mt-1 text-xl font-bold text-green-600">{fmt(fin?.total_cot_paye_annee ?? fin?.total_cot_paye)}</p>
               <p className="text-xs text-gray-400 mt-0.5">Mois payés {annee}</p>
             </div>
             <div className="w-10 h-10 rounded-lg bg-green-50 text-green-600 flex items-center justify-center flex-shrink-0">
@@ -128,8 +128,8 @@ function GestDashboard() {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-xs font-medium text-gray-500">Cotisations impayées</p>
-              <p className="mt-1 text-xl font-bold text-red-600">{fmt(fin?.total_cot_impaye)}</p>
-              <p className="text-xs text-gray-400 mt-0.5">Mois échus non payés</p>
+              <p className="mt-1 text-xl font-bold text-red-600">{fmt(fin?.total_cot_impaye_annee ?? fin?.total_cot_impaye)}</p>
+              <p className="text-xs text-gray-400 mt-0.5">Mois échus non payés {annee}</p>
             </div>
             <div className="w-10 h-10 rounded-lg bg-red-50 text-red-500 flex items-center justify-center flex-shrink-0">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -234,29 +234,33 @@ function GestDashboard() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Cotisations collectées</span>
-                <span className="font-medium text-green-600">{fmt(fin.total_cot_paye)}</span>
+                <span className="font-medium text-green-600">{fmt(fin.total_cot_paye_annee ?? fin.total_cot_paye)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Cotisations impayées</span>
-                <span className="font-medium text-red-600">{fmt(fin.total_cot_impaye)}</span>
+                <span className="font-medium text-red-600">{fmt(fin.total_cot_impaye_annee ?? fin.total_cot_impaye)}</span>
               </div>
               <div className="pt-2 border-t border-gray-100">
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-500">Taux de recouvrement</span>
-                  <span className="font-bold text-gray-800">
-                    {fin.total_cot_attendu > 0 ? Math.round((fin.total_cot_paye / fin.total_cot_attendu) * 100) : 0}%
-                  </span>
-                </div>
-                <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-green-500 rounded-full transition-all"
-                    style={{ width: `${fin.total_cot_attendu > 0 ? Math.round((fin.total_cot_paye / fin.total_cot_attendu) * 100) : 0}%` }}
-                  />
-                </div>
+                {(() => {
+                  const p = fin.total_cot_paye_annee ?? fin.total_cot_paye;
+                  const a = fin.total_cot_attendu_annee ?? fin.total_cot_attendu;
+                  const t = a > 0 ? Math.round((p / a) * 100) : 0;
+                  return (
+                    <>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-gray-500">Taux de recouvrement</span>
+                        <span className="font-bold text-gray-800">{t}%</span>
+                      </div>
+                      <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="h-full bg-green-500 rounded-full transition-all"
+                          style={{ width: `${Math.min(t, 100)}%` }} />
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
-
           {/* Recent charges */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100">
             <div className="px-5 py-4 border-b border-gray-100">
