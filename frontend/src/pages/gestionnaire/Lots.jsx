@@ -16,10 +16,25 @@ const typeColors = {
 
 const emptyForm = { numero: '', type: 'Appartement', surface: '', tantiemes: '', copropietaire_id: '' };
 
+function SortIcon({ active, dir }) {
+  return (
+    <span className="inline-flex flex-col ml-1 gap-0" style={{ lineHeight: 0 }}>
+      <svg className={`w-2.5 h-2.5 ${active && dir === 'asc' ? 'text-blue-600' : 'text-gray-300'}`} viewBox="0 0 10 6" fill="currentColor">
+        <path d="M5 0L10 6H0L5 0Z" />
+      </svg>
+      <svg className={`w-2.5 h-2.5 ${active && dir === 'desc' ? 'text-blue-600' : 'text-gray-300'}`} viewBox="0 0 10 6" fill="currentColor">
+        <path d="M5 6L0 0H10L5 6Z" />
+      </svg>
+    </span>
+  );
+}
+
 function Lots() {
   const { selectedCoproId } = useAuth();
   const [list, setList] = useState([]);
   const [copropietaires, setCopropietaires] = useState([]);
+  const [sortCol, setSortCol] = useState('numero');
+  const [sortDir, setSortDir] = useState('asc');
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -105,6 +120,22 @@ function Lots() {
 
   const available = availableForForm(editId);
 
+  const toggleSort = (col) => {
+    if (sortCol === col) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortCol(col); setSortDir('asc'); }
+  };
+
+  const sorted = [...list].sort((a, b) => {
+    let va, vb;
+    if (sortCol === 'numero') { va = a.numero || ''; vb = b.numero || ''; }
+    else if (sortCol === 'type') { va = a.type || ''; vb = b.type || ''; }
+    else if (sortCol === 'surface') { va = parseFloat(a.surface) || 0; vb = parseFloat(b.surface) || 0; return sortDir === 'asc' ? va - vb : vb - va; }
+    else if (sortCol === 'tantiemes') { va = parseFloat(a.tantiemes) || 0; vb = parseFloat(b.tantiemes) || 0; return sortDir === 'asc' ? va - vb : vb - va; }
+    else if (sortCol === 'copropietaire') { va = `${a.copropietaire_nom || ''} ${a.copropietaire_prenom || ''}`.trim(); vb = `${b.copropietaire_nom || ''} ${b.copropietaire_prenom || ''}`.trim(); }
+    else { va = ''; vb = ''; }
+    return sortDir === 'asc' ? va.localeCompare(vb, 'fr') : vb.localeCompare(va, 'fr');
+  });
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
@@ -125,16 +156,32 @@ function Lots() {
           <table className="w-full text-sm min-w-[600px]">
             <thead className="bg-gray-50">
               <tr>
-                {['N°', 'Type', 'Surface', 'Tantièmes', 'Copropriétaire', ''].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{h}</th>
+                {[
+                  { label: 'N°', col: 'numero' },
+                  { label: 'Type', col: 'type' },
+                  { label: 'Surface', col: 'surface' },
+                  { label: 'Tantièmes', col: 'tantiemes' },
+                  { label: 'Copropriétaire', col: 'copropietaire' },
+                  { label: '', col: null },
+                ].map(({ label, col }) => (
+                  <th
+                    key={label + (col || '')}
+                    className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase ${col ? 'cursor-pointer select-none hover:text-gray-700' : ''}`}
+                    onClick={col ? () => toggleSort(col) : undefined}
+                  >
+                    <span className="inline-flex items-center">
+                      {label}
+                      {col && <SortIcon active={sortCol === col} dir={sortDir} />}
+                    </span>
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {list.length === 0 && (
+              {sorted.length === 0 && (
                 <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">Aucun lot enregistré</td></tr>
               )}
-              {list.map((lot) => (
+              {sorted.map((lot) => (
                 <tr key={lot.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-800">{lot.numero}</td>
                   <td className="px-4 py-3">
