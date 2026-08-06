@@ -69,6 +69,20 @@ export const coproprietes = {
   delete: (id) => api.delete(`/coproprietes/${id}`),
   getLots: (id) => api.get(`/coproprietes/${id}/lots`),
   createLot: (id, data) => api.post(`/coproprietes/${id}/lots`, data),
+  getDocuments: (id) => api.get(`/coproprietes/${id}/documents`),
+  uploadDocument: (id, file, nom, type) => {
+    const form = new FormData();
+    form.append('document', file);
+    form.append('nom', nom);
+    form.append('type', type);
+    const token = getToken();
+    return fetch(`${BASE_URL}/coproprietes/${id}/documents`, {
+      method: 'POST',
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: form,
+    }).then((r) => r.ok ? r.json() : r.json().then((e) => Promise.reject(new Error(e.error || 'Erreur upload'))));
+  },
+  deleteDocument: (coproId, docId) => api.delete(`/coproprietes/${coproId}/documents/${docId}`),
 };
 
 // Lots

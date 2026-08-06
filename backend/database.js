@@ -316,6 +316,19 @@ try {
 // Document PDF attaché à un contrat
 try { db.exec('ALTER TABLE contrats ADD COLUMN document_url TEXT'); } catch {}
 
+// Documents de la copropriété (règlement, contrat syndic, assurance, etc.)
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS documents_copropriete (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    copropriete_id INTEGER NOT NULL REFERENCES coproprietes(id) ON DELETE CASCADE,
+    type TEXT NOT NULL DEFAULT 'autre',
+    nom TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    url TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+} catch {}
+
 // Link depenses to fournisseurs
 try { db.exec('ALTER TABLE depenses ADD COLUMN fournisseur_id INTEGER REFERENCES fournisseurs(id) ON DELETE SET NULL'); } catch {}
 

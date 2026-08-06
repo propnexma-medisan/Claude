@@ -1,7 +1,26 @@
 const express = require('express');
 const router = express.Router();
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const db = require('../database');
 const { canGestionnaireAccessResidence } = require('../utils/access');
+
+const uploadDir = path.join(__dirname, '../uploads');
+const docUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadDir),
+    filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname.replace(/\s+/g, '_')),
+  }),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => cb(null, file.mimetype === 'application/pdf'),
+});
+
+function canAccess(user, coproprieteId) {
+  if (user.role === 'admin') return true;
+  if (user.role === 'gestionnaire') return canGestionnaireAccessResidence(user.id, coproprieteId);
+  return false;
+}
 
 // GET all coproprietes
 router.get('/', (req, res) => {
@@ -142,6 +161,49 @@ router.post('/:id/lots', (req, res) => {
       WHERE l.id = ?
     `).get(lotId);
     res.status(201).json(newLot);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/coproprietes/:id/documents
+router.get('/:id/documents', (req, res) => {
+  try {
+    if (!canAccess(req.user, req.params.id)) return res.status(403).json({ error: 'Accès refusé' });
+    const docs = db.prepare('SELECT * FROM documents_copropriete WHERE copropriete_id = ? ORDER BY type ASC, created_at DESC').all(req.params.id);
+    res.json(docs);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/coproprietes/:id/documents
+router.post('/:id/documents', docUpload.single('document'), (req, res) => {
+  try {
+    if (!canAccess(req.user, req.params.id)) return res.status(403).json({ error: 'Accès refusé' });
+    if (!req.file) return res.status(400).json({ error: 'Aucun fichier PDF reçu' });
+    const { type, nom } = req.body;
+    if (!nom) return res.status(400).json({ error: 'Nom du document requis' });
+    const url = `/api/uploads/${req.file.filename}`;
+    const result = db.prepare(
+      'INSERT INTO documents_copropriete (copropriete_id, type, nom, filename, url) VALUES (?, ?, ?, ?, ?)'
+    ).run(req.params.id, type || 'autre', nom, req.file.filename, url);
+    const doc = db.prepare('SELECT * FROM documents_copropriete WHERE id = ?').get(result.lastInsertRowid);
+    res.status(201).json(doc);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/coproprietes/:id/documents/:docId
+router.delete('/:id/documents/:docId', (req, res) => {
+  try {
+    if (!canAccess(req.user, req.params.id)) return res.status(403).json({ error: 'Accès refusé' });
+    const doc = db.prepare('SELECT * FROM documents_copropriete WHERE id = ? AND copropriete_id = ?').get(req.params.docId, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document non trouvé' });
+    try { fs.unlinkSync(path.join(uploadDir, doc.filename)); } catch {}
+    db.prepare('DELETE FROM documents_copropriete WHERE id = ?').run(req.params.docId);
+    res.json({ message: 'Document supprimé' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
