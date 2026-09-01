@@ -69,6 +69,7 @@ export const coproprietes = {
   delete: (id) => api.delete(`/coproprietes/${id}`),
   getLots: (id) => api.get(`/coproprietes/${id}/lots`),
   createLot: (id, data) => api.post(`/coproprietes/${id}/lots`, data),
+  getActivation: (id) => api.get(`/coproprietes/${id}/activation`),
   getDocuments: (id) => api.get(`/coproprietes/${id}/documents`),
   uploadDocument: (id, file, nom, type) => {
     const form = new FormData();

@@ -35,6 +35,7 @@ import AG from './pages/gestionnaire/AG';
 import GestProfil from './pages/gestionnaire/GestProfil';
 import RapportCotisations from './pages/gestionnaire/RapportCotisations';
 import Documents from './pages/gestionnaire/Documents';
+import Activation from './pages/gestionnaire/Activation';
 
 // Copropriétaire pages
 import MonProfil from './pages/copropietaire/MonProfil';
@@ -111,6 +112,7 @@ function App() {
         <Route path="profil" element={<GestProfil />} />
         <Route path="rapport" element={<RapportCotisations />} />
         <Route path="documents" element={<Documents />} />
+        <Route path="activation" element={<Activation />} />
       </Route>
 
       {/* Membre bureau syndical */}

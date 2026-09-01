@@ -285,7 +285,7 @@ router.post('/:id/resend-credentials', authenticate, requireRole('gestionnaire',
       residence: existing.copropriete_nom || null,
     });
 
-    res.json({ message: 'Identifiants renvoyés avec succès' });
+    res.json({ message: 'Identifiants renvoyés avec succès', tempPassword, email: existing.email });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

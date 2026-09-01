@@ -419,4 +419,7 @@ try { db.exec('ALTER TABLE cotisation_paiements ADD COLUMN montant_regle REAL');
 // Signature + cachet numérique du gestionnaire
 try { db.exec('ALTER TABLE users ADD COLUMN signature_url TEXT'); } catch {}
 
+// Suivi de la dernière connexion (pour tableau d'activation)
+try { db.exec('ALTER TABLE users ADD COLUMN last_login DATETIME'); } catch {}
+
 module.exports = db;

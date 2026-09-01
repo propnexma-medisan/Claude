@@ -33,6 +33,8 @@ router.post('/login', (req, res) => {
 
     const token = signToken(user);
 
+    db.prepare('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
+
     const { password_hash, ...safeUser } = user;
     safeUser.coproprietes = user.role === 'gestionnaire' ? getGestionnaireResidences(user.id) : [];
 

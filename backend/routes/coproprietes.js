@@ -166,6 +166,31 @@ router.post('/:id/lots', (req, res) => {
   }
 });
 
+// GET /api/coproprietes/:id/activation — tableau d'activation des copropriétaires
+router.get('/:id/activation', (req, res) => {
+  try {
+    if (!canAccess(req.user, req.params.id)) return res.status(403).json({ error: 'Accès refusé' });
+    const coproId = Number(req.params.id);
+
+    const lots = db.prepare(`
+      SELECT l.id as lot_id, l.numero, l.type,
+        u.id as user_id, u.nom, u.prenom, u.email, u.telephone, u.created_at, u.last_login
+      FROM lots l
+      LEFT JOIN users u ON u.lot_id = l.id AND u.role = 'copropietaire' AND u.is_active = 1
+      WHERE l.copropriete_id = ?
+      ORDER BY l.numero ASC
+    `).all(coproId);
+
+    const total_lots = lots.length;
+    const avec_compte = lots.filter(l => l.user_id).length;
+    const actives = lots.filter(l => l.last_login).length;
+
+    res.json({ total_lots, avec_compte, actives, lots });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/coproprietes/:id/documents
 router.get('/:id/documents', (req, res) => {
   try {
