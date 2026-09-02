@@ -113,6 +113,26 @@ router.post('/activate/:token', async (req, res) => {
       WHERE id = ?
     `).run(email.toLowerCase().trim(), password_hash, user.id);
 
+    // Notifier le gestionnaire de la résidence via WhatsApp Chatwoot
+    try {
+      const lot = db.prepare('SELECT numero FROM lots WHERE id = ?').get(user.lot_id);
+      const gestionnaire = db.prepare(`
+        SELECT u.prenom, u.nom, u.telephone
+        FROM users u
+        JOIN gestionnaire_residences gr ON gr.gestionnaire_id = u.id
+        WHERE gr.copropriete_id = ? AND u.is_active = 1
+        LIMIT 1
+      `).get(user.copropriete_id);
+
+      if (gestionnaire?.telephone) {
+        const { sendWhatsAppMessage } = require('../services/chatwoot');
+        const tel = gestionnaire.telephone.replace(/[\s\-]/g, '').replace(/^0/, '+212');
+        const copro = db.prepare('SELECT nom FROM coproprietes WHERE id = ?').get(user.copropriete_id);
+        const msg = `✅ *${user.prenom} ${user.nom}* vient d'activer son compte copropriétaire${lot ? ` (Lot ${lot.numero})` : ''} sur SyndicPro.\n\n🏢 Résidence : ${copro?.nom || ''}\n📧 ${email}`;
+        sendWhatsAppMessage({ phone: tel, name: `${gestionnaire.prenom} ${gestionnaire.nom}`, message: msg }).catch(() => {});
+      }
+    } catch {}
+
     res.json({ message: 'Compte activé avec succès' });
   } catch (err) {
     res.status(500).json({ error: err.message });
