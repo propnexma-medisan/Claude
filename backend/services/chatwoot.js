@@ -56,6 +56,7 @@ function chatwootRequest(path, method = 'GET', body = null) {
 }
 
 async function findOrCreateContact(phone, name) {
+  // Recherche contact existant
   try {
     const search = await chatwootRequest(`/contacts/search?q=${encodeURIComponent(phone)}&page=1`);
     const found = (search.payload || []).find(c => c.phone_number === phone);
@@ -64,13 +65,24 @@ async function findOrCreateContact(phone, name) {
       return found.id;
     }
   } catch (e) {
-    console.log(`[Chatwoot] Recherche contact: ${e.message}`);
+    console.log(`[Chatwoot] Recherche: ${e.message}`);
   }
 
-  console.log(`[Chatwoot] Création contact ${phone}`);
-  const contact = await chatwootRequest('/contacts', 'POST', { name, phone_number: phone });
-  console.log(`[Chatwoot] Contact créé id=${contact.id}`);
-  return contact.id;
+  // Création contact
+  try {
+    console.log(`[Chatwoot] Création contact ${phone}`);
+    const contact = await chatwootRequest('/contacts', 'POST', { name, phone_number: phone });
+    console.log(`[Chatwoot] Contact créé id=${contact.id}`);
+    return contact.id;
+  } catch (e) {
+    // Si le numéro existe déjà, on le recherche à nouveau
+    if (e.message.includes('already been taken')) {
+      const search = await chatwootRequest(`/contacts/search?q=${encodeURIComponent(phone)}&page=1`);
+      const found = (search.payload || []).find(c => c.phone_number === phone);
+      if (found) return found.id;
+    }
+    throw e;
+  }
 }
 
 async function sendWhatsAppMessage({ phone, name, message }) {
@@ -79,8 +91,9 @@ async function sendWhatsAppMessage({ phone, name, message }) {
   console.log(`[Chatwoot] Début envoi → ${phone}`);
   const contactId = await findOrCreateContact(phone, name);
 
-  console.log(`[Chatwoot] Création conversation inbox=${INBOX}`);
-  const conv = await chatwootRequest(`/contacts/${contactId}/conversations`, 'POST', { inbox_id: INBOX });
+  // Endpoint direct (pas /contacts/:id/conversations qui retourne 404)
+  console.log(`[Chatwoot] Création conversation inbox=${INBOX} contact=${contactId}`);
+  const conv = await chatwootRequest('/conversations', 'POST', { inbox_id: INBOX, contact_id: contactId });
   console.log(`[Chatwoot] Conversation id=${conv.id}`);
 
   await chatwootRequest(`/conversations/${conv.id}/messages`, 'POST', {
