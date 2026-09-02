@@ -59,7 +59,8 @@ export default function Activation() {
           message,
         });
         alert('Message envoyé via Chatwoot ✓');
-      } catch {
+      } catch (chatwootErr) {
+        console.error('[Chatwoot fallback]', chatwootErr?.message);
         const link = buildWhatsAppLink(lot, res.email, res.tempPassword, residence, res.activationToken);
         window.open(link, '_blank');
       }

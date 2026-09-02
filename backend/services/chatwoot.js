@@ -55,31 +55,49 @@ function chatwootRequest(path, method = 'GET', body = null) {
   });
 }
 
-async function findOrCreateContact(phone, name) {
-  // Recherche contact existant
+async function findContactByPhone(phone) {
+  // Essai 1 : endpoint search
   try {
     const search = await chatwootRequest(`/contacts/search?q=${encodeURIComponent(phone)}&page=1`);
     const found = (search.payload || []).find(c => c.phone_number === phone);
-    if (found) {
-      console.log(`[Chatwoot] Contact existant id=${found.id}`);
-      return found.id;
-    }
+    if (found) return found.id;
   } catch (e) {
-    console.log(`[Chatwoot] Recherche: ${e.message}`);
+    console.log(`[Chatwoot] search échoué: ${e.message}`);
   }
 
-  // Création contact
+  // Essai 2 : endpoint filter
+  try {
+    const filter = await chatwootRequest('/contacts/filter', 'POST', {
+      payload: [{ attribute_key: 'phone_number', filter_operator: 'equal_to', values: [phone], query_operator: null }]
+    });
+    const found = (filter.payload || []).find(c => c.phone_number === phone);
+    if (found) return found.id;
+  } catch (e) {
+    console.log(`[Chatwoot] filter échoué: ${e.message}`);
+  }
+
+  return null;
+}
+
+async function findOrCreateContact(phone, name) {
+  // 1. Chercher le contact existant
+  const existingId = await findContactByPhone(phone);
+  if (existingId) {
+    console.log(`[Chatwoot] Contact existant id=${existingId}`);
+    return existingId;
+  }
+
+  // 2. Créer le contact
   try {
     console.log(`[Chatwoot] Création contact ${phone}`);
     const contact = await chatwootRequest('/contacts', 'POST', { name, phone_number: phone });
     console.log(`[Chatwoot] Contact créé id=${contact.id}`);
     return contact.id;
   } catch (e) {
-    // Si le numéro existe déjà, on le recherche à nouveau
+    // Si déjà pris entre temps, retry recherche
     if (e.message.includes('already been taken')) {
-      const search = await chatwootRequest(`/contacts/search?q=${encodeURIComponent(phone)}&page=1`);
-      const found = (search.payload || []).find(c => c.phone_number === phone);
-      if (found) return found.id;
+      const retryId = await findContactByPhone(phone);
+      if (retryId) return retryId;
     }
     throw e;
   }
