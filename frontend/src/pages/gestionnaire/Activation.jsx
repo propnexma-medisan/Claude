@@ -10,10 +10,13 @@ function statutLabel(lot) {
   return { label: 'Non connecté', color: 'bg-amber-100 text-amber-700', icon: '◌' };
 }
 
-function buildWhatsAppLink(lot, email, password, residence) {
+function buildWhatsAppLink(lot, email, password, residence, activationToken) {
   const tel = lot.telephone ? lot.telephone.replace(/[\s\-]/g, '').replace(/^0/, '+212') : '';
   const prenom = lot.prenom || lot.nom || 'Madame/Monsieur';
-  const msg = `Bonjour ${prenom},\n\nVoici vos accès à l'espace copropriétaires de *${residence}* géré par Propnex Property Management :\n\n🔗 https://syndic.propnex.ma\n📧 ${email}\n🔑 ${password}\n\nConnectez-vous pour consulter vos cotisations, suivre vos demandes et recevoir les convocations d'AG.\n\nÀ votre disposition, \n_Propnex Property Management_`;
+  const activationLink = activationToken
+    ? `https://syndic.propnex.ma/activer?token=${activationToken}`
+    : 'https://syndic.propnex.ma';
+  const msg = `Bonjour ${prenom},\n\nVotre espace copropriétaire pour *${residence}* géré par Propnex Property Management est prêt.\n\nCliquez sur ce lien pour activer votre compte et choisir votre mot de passe :\n🔗 ${activationLink}\n\n_(Identifiants provisoires si besoin : 📧 ${email} / 🔑 ${password})_\n\nÀ votre disposition,\n_Propnex Property Management_`;
   if (tel) return `https://wa.me/${tel}?text=${encodeURIComponent(msg)}`;
   return `https://wa.me/?text=${encodeURIComponent(msg)}`;
 }
@@ -40,7 +43,7 @@ export default function Activation() {
     setSending(s => ({ ...s, [lot.lot_id]: true }));
     try {
       const res = await usersApi.resendCredentials(lot.user_id);
-      const link = buildWhatsAppLink(lot, res.email, res.tempPassword, selectedCoproName || 'votre résidence');
+      const link = buildWhatsAppLink(lot, res.email, res.tempPassword, selectedCoproName || 'votre résidence', res.activationToken);
       window.open(link, '_blank');
       setTimeout(() => load(), 1200);
     } catch (err) {

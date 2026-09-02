@@ -422,4 +422,8 @@ try { db.exec('ALTER TABLE users ADD COLUMN signature_url TEXT'); } catch {}
 // Suivi de la dernière connexion (pour tableau d'activation)
 try { db.exec('ALTER TABLE users ADD COLUMN last_login DATETIME'); } catch {}
 
+// Token d'activation pour le flow premier-login (onboarding WhatsApp)
+try { db.exec('ALTER TABLE users ADD COLUMN activation_token TEXT'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN must_activate INTEGER DEFAULT 0'); } catch {}
+
 module.exports = db;

@@ -4,6 +4,7 @@ import { useAuth } from './contexts/AuthContext';
 
 // Public
 import Login from './pages/Login';
+import Activer from './pages/Activer';
 
 // Layouts
 import AdminLayout from './components/AdminLayout';
@@ -82,6 +83,7 @@ function App() {
 
       {/* Public */}
       <Route path="/login" element={<Login />} />
+      <Route path="/activer" element={<Activer />} />
 
       {/* Admin */}
       <Route path="/admin" element={<AdminLayout />}>

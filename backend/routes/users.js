@@ -273,7 +273,11 @@ router.post('/:id/resend-credentials', authenticate, requireRole('gestionnaire',
     const tempPassword = Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
     const password_hash = await bcrypt.hash(tempPassword, 10);
 
-    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(password_hash, id);
+    // Generate activation token (UUID-like)
+    const crypto = require('crypto');
+    const activationToken = crypto.randomBytes(24).toString('hex');
+
+    db.prepare('UPDATE users SET password_hash = ?, activation_token = ?, must_activate = 1 WHERE id = ?').run(password_hash, activationToken, id);
 
     await sendBienvenue({
       to: existing.email,
@@ -285,7 +289,7 @@ router.post('/:id/resend-credentials', authenticate, requireRole('gestionnaire',
       residence: existing.copropriete_nom || null,
     });
 
-    res.json({ message: 'Identifiants renvoyés avec succès', tempPassword, email: existing.email });
+    res.json({ message: 'Identifiants renvoyés avec succès', tempPassword, email: existing.email, activationToken });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

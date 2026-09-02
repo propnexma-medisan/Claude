@@ -72,4 +72,51 @@ router.post('/logout', (req, res) => {
   res.json({ message: 'Déconnecté avec succès' });
 });
 
+// GET /api/auth/activate/:token — public, verify activation token and return user info
+router.get('/activate/:token', (req, res) => {
+  try {
+    const { token } = req.params;
+    const user = db.prepare(`
+      SELECT u.id, u.nom, u.prenom, u.email, u.must_activate,
+             c.nom as copropriete_nom
+      FROM users u
+      LEFT JOIN coproprietes c ON u.copropriete_id = c.id
+      WHERE u.activation_token = ? AND u.is_active = 1
+    `).get(token);
+    if (!user) return res.status(404).json({ error: 'Lien invalide ou expiré' });
+    res.json({ prenom: user.prenom, nom: user.nom, copropriete: user.copropriete_nom });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/auth/activate/:token — public, set real email + new password and mark activated
+router.post('/activate/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { email, password } = req.body;
+
+    if (!email || !password) return res.status(400).json({ error: 'Email et mot de passe requis' });
+    if (password.length < 6) return res.status(400).json({ error: 'Le mot de passe doit faire au moins 6 caractères' });
+
+    const user = db.prepare(`SELECT * FROM users WHERE activation_token = ? AND is_active = 1`).get(token);
+    if (!user) return res.status(404).json({ error: 'Lien invalide ou expiré' });
+
+    // Check email not already taken by another account
+    const emailConflict = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(email.toLowerCase().trim(), user.id);
+    if (emailConflict) return res.status(409).json({ error: 'Cet email est déjà utilisé' });
+
+    const password_hash = await bcrypt.hash(password, 10);
+
+    db.prepare(`
+      UPDATE users SET email = ?, password_hash = ?, activation_token = NULL, must_activate = 0, last_login = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(email.toLowerCase().trim(), password_hash, user.id);
+
+    res.json({ message: 'Compte activé avec succès' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
