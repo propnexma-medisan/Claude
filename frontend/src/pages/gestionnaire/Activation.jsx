@@ -57,6 +57,11 @@ export default function Activation() {
           prenom: lot.prenom,
           nom: lot.nom,
           message,
+          templateParams: {
+            '1': lot.prenom || lot.nom || 'Madame/Monsieur',
+            '2': residence,
+            '3': activationLink,
+          },
         });
         alert('Message envoyé via Chatwoot ✓');
       } catch (chatwootErr) {

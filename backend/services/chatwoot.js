@@ -6,6 +6,7 @@ const BASE = process.env.CHATWOOT_URL || 'https://chat.propnex.ma';
 const TOKEN = process.env.CHATWOOT_TOKEN || '';
 const ACCOUNT = process.env.CHATWOOT_ACCOUNT_ID || '2';
 const INBOX = parseInt(process.env.CHATWOOT_INBOX_ID || '6', 10);
+const TEMPLATE_NAME = process.env.CHATWOOT_TEMPLATE_NAME || '';
 
 function chatwootRequest(path, method = 'GET', body = null) {
   return new Promise((resolve, reject) => {
@@ -103,22 +104,40 @@ async function findOrCreateContact(phone, name) {
   }
 }
 
-async function sendWhatsAppMessage({ phone, name, message }) {
+async function sendWhatsAppMessage({ phone, name, message, templateParams }) {
   if (!TOKEN) throw new Error('CHATWOOT_TOKEN non configuré dans .env');
 
   console.log(`[Chatwoot] Début envoi → ${phone}`);
   const contactId = await findOrCreateContact(phone, name);
 
-  // Endpoint direct (pas /contacts/:id/conversations qui retourne 404)
   console.log(`[Chatwoot] Création conversation inbox=${INBOX} contact=${contactId}`);
   const conv = await chatwootRequest('/conversations', 'POST', { inbox_id: INBOX, contact_id: contactId });
   console.log(`[Chatwoot] Conversation id=${conv.id}`);
 
-  await chatwootRequest(`/conversations/${conv.id}/messages`, 'POST', {
-    content: message,
-    message_type: 'outgoing',
-    private: false,
-  });
+  if (TEMPLATE_NAME && templateParams) {
+    // Template message requis pour initier une conversation WhatsApp (fenêtre 24h non ouverte)
+    console.log(`[Chatwoot] Envoi template "${TEMPLATE_NAME}"`);
+    await chatwootRequest(`/conversations/${conv.id}/messages`, 'POST', {
+      content: TEMPLATE_NAME,
+      message_type: 'outgoing',
+      private: false,
+      content_attributes: {
+        template_params: {
+          name: TEMPLATE_NAME,
+          category: 'UTILITY',
+          language: 'fr',
+          processed_params: templateParams,
+        },
+      },
+    });
+  } else {
+    // Message libre (fenêtre 24h ouverte ou test)
+    await chatwootRequest(`/conversations/${conv.id}/messages`, 'POST', {
+      content: message,
+      message_type: 'outgoing',
+      private: false,
+    });
+  }
 
   console.log(`[Chatwoot] ✓ Message envoyé conversation ${conv.id}`);
   return { conversation_id: conv.id };
