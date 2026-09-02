@@ -426,4 +426,7 @@ try { db.exec('ALTER TABLE users ADD COLUMN last_login DATETIME'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN activation_token TEXT'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN must_activate INTEGER DEFAULT 0'); } catch {}
 
+// Suivi de l'envoi d'invitation WhatsApp
+try { db.exec('ALTER TABLE users ADD COLUMN whatsapp_invite_sent_at DATETIME'); } catch {}
+
 module.exports = db;

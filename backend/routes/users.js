@@ -316,6 +316,8 @@ router.post('/:id/send-whatsapp-invite', authenticate, requireRole('gestionnaire
     const { sendWhatsAppMessage } = require('../services/chatwoot');
     await sendWhatsAppMessage({ phone: tel, name: `${prenom || existing.prenom} ${nom || existing.nom}`, message });
 
+    db.prepare('UPDATE users SET whatsapp_invite_sent_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+
     res.json({ sent: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

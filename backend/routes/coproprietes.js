@@ -174,7 +174,7 @@ router.get('/:id/activation', (req, res) => {
 
     const lots = db.prepare(`
       SELECT l.id as lot_id, l.numero, l.type,
-        u.id as user_id, u.nom, u.prenom, u.email, u.telephone, u.created_at, u.last_login
+        u.id as user_id, u.nom, u.prenom, u.email, u.telephone, u.created_at, u.last_login, u.whatsapp_invite_sent_at
       FROM lots l
       LEFT JOIN users u ON u.lot_id = l.id AND u.role = 'copropietaire' AND u.is_active = 1
       WHERE l.copropriete_id = ?
