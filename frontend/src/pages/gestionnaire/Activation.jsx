@@ -43,8 +43,27 @@ export default function Activation() {
     setSending(s => ({ ...s, [lot.lot_id]: true }));
     try {
       const res = await usersApi.resendCredentials(lot.user_id);
-      const link = buildWhatsAppLink(lot, res.email, res.tempPassword, selectedCoproName || 'votre résidence', res.activationToken);
-      window.open(link, '_blank');
+      const residence = selectedCoproName || 'votre résidence';
+      const activationLink = res.activationToken
+        ? `https://syndicpro.propnex.ma/activer?token=${res.activationToken}`
+        : 'https://syndicpro.propnex.ma';
+      const prenom = lot.prenom || lot.nom || 'Madame/Monsieur';
+      const message = `Bonjour ${prenom},\n\nVotre espace copropriétaire pour *${residence}* géré par Propnex Property Management est prêt.\n\nCliquez sur ce lien pour activer votre compte et choisir votre mot de passe :\n🔗 ${activationLink}\n\n_(Identifiants provisoires si besoin : 📧 ${res.email} / 🔑 ${res.tempPassword})_\n\nÀ votre disposition,\n_Propnex Property Management_`;
+
+      // Tente envoi via Chatwoot, fallback wa.me si échec
+      try {
+        await usersApi.sendWhatsAppInvite(lot.user_id, {
+          phone: lot.telephone,
+          prenom: lot.prenom,
+          nom: lot.nom,
+          message,
+        });
+        alert('Message envoyé via Chatwoot ✓');
+      } catch {
+        const link = buildWhatsAppLink(lot, res.email, res.tempPassword, residence, res.activationToken);
+        window.open(link, '_blank');
+      }
+
       setTimeout(() => load(), 1200);
     } catch (err) {
       alert(err.message);

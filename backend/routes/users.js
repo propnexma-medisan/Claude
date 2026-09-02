@@ -295,6 +295,33 @@ router.post('/:id/resend-credentials', authenticate, requireRole('gestionnaire',
   }
 });
 
+// POST /api/users/:id/send-whatsapp-invite — envoie l'invitation via Chatwoot WhatsApp
+router.post('/:id/send-whatsapp-invite', authenticate, requireRole('gestionnaire', 'admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { phone, prenom, nom, message } = req.body;
+
+    const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    if (!existing) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+
+    if (req.user.role === 'gestionnaire') {
+      if (existing.role !== 'copropietaire' || !canGestionnaireAccessResidence(req.user.id, existing.copropriete_id)) {
+        return res.status(403).json({ error: 'Accès refusé' });
+      }
+    }
+
+    const tel = phone ? phone.replace(/[\s\-]/g, '').replace(/^0/, '+212') : existing.telephone?.replace(/[\s\-]/g, '').replace(/^0/, '+212');
+    if (!tel) return res.status(400).json({ error: 'Numéro de téléphone manquant' });
+
+    const { sendWhatsAppMessage } = require('../services/chatwoot');
+    await sendWhatsAppMessage({ phone: tel, name: `${prenom || existing.prenom} ${nom || existing.nom}`, message });
+
+    res.json({ sent: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/users/upload-signature — gestionnaire or admin uploads their own signature+stamp image
 router.post('/upload-signature', authenticate, uploadSig.single('signature'), (req, res) => {
   try {

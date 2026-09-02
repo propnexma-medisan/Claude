@@ -138,6 +138,7 @@ export const users = {
   delete: (id) => api.delete(`/users/${id}`),
   byResidence: (coproprieteId) => api.get(`/users/by-residence/${coproprieteId}`),
   resendCredentials: (id) => api.post(`/users/${id}/resend-credentials`, {}),
+  sendWhatsAppInvite: (id, data) => api.post(`/users/${id}/send-whatsapp-invite`, data),
   uploadSignature: (file) => {
     const form = new FormData();
     form.append('signature', file);
