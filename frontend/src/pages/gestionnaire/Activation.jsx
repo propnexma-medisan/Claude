@@ -14,8 +14,8 @@ function buildWhatsAppLink(lot, email, password, residence, activationToken) {
   const tel = lot.telephone ? lot.telephone.replace(/[\s\-]/g, '').replace(/^0/, '+212') : '';
   const prenom = lot.prenom || lot.nom || 'Madame/Monsieur';
   const activationLink = activationToken
-    ? `https://syndic.propnex.ma/activer?token=${activationToken}`
-    : 'https://syndic.propnex.ma';
+    ? `https://syndicpro.propnex.ma/activer?token=${activationToken}`
+    : 'https://syndicpro.propnex.ma';
   const msg = `Bonjour ${prenom},\n\nVotre espace copropriétaire pour *${residence}* géré par Propnex Property Management est prêt.\n\nCliquez sur ce lien pour activer votre compte et choisir votre mot de passe :\n🔗 ${activationLink}\n\n_(Identifiants provisoires si besoin : 📧 ${email} / 🔑 ${password})_\n\nÀ votre disposition,\n_Propnex Property Management_`;
   if (tel) return `https://wa.me/${tel}?text=${encodeURIComponent(msg)}`;
   return `https://wa.me/?text=${encodeURIComponent(msg)}`;
