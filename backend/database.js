@@ -429,4 +429,7 @@ try { db.exec('ALTER TABLE users ADD COLUMN must_activate INTEGER DEFAULT 0'); }
 // Suivi de l'envoi d'invitation WhatsApp
 try { db.exec('ALTER TABLE users ADD COLUMN whatsapp_invite_sent_at DATETIME'); } catch {}
 
+// Ville du gestionnaire (pour "Fait à [Ville], le [date]" dans les documents)
+try { db.exec('ALTER TABLE users ADD COLUMN ville TEXT'); } catch {}
+
 module.exports = db;

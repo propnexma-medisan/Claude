@@ -186,7 +186,7 @@ router.put('/:id', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
-    const { nom, prenom, email, telephone, password, copropriete_id, copropriete_ids, lot_id, role, is_active, is_membre_bureau } = req.body;
+    const { nom, prenom, email, telephone, ville, password, copropriete_id, copropriete_ids, lot_id, role, is_active, is_membre_bureau } = req.body;
 
     let password_hash = existing.password_hash;
     if (password) {
@@ -211,7 +211,7 @@ router.put('/:id', authenticate, async (req, res) => {
     }
 
     db.prepare(`
-      UPDATE users SET nom = ?, prenom = ?, email = ?, telephone = ?, password_hash = ?,
+      UPDATE users SET nom = ?, prenom = ?, email = ?, telephone = ?, ville = ?, password_hash = ?,
         copropriete_id = ?, lot_id = ?, role = ?, is_active = ?, is_membre_bureau = ?
       WHERE id = ?
     `).run(
@@ -219,6 +219,7 @@ router.put('/:id', authenticate, async (req, res) => {
       prenom || existing.prenom,
       email ? email.toLowerCase().trim() : existing.email,
       telephone !== undefined ? telephone : existing.telephone,
+      ville !== undefined ? ville : existing.ville,
       password_hash,
       newCoproId || null,
       newLotId || null,

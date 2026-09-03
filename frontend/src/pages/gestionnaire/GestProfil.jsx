@@ -16,6 +16,7 @@ function GestProfil() {
     prenom: user?.prenom || '',
     email: user?.email || '',
     telephone: user?.telephone || '',
+    ville: user?.ville || '',
     password: '',
     password_confirm: '',
   });
@@ -42,9 +43,8 @@ function GestProfil() {
         setHasSignature(false);
         setSigPreview(null);
       }
-    }).catch(() => {
-      // Keep whatever we already have from user context
-    });
+      if (fresh.ville) setForm((f) => ({ ...f, ville: fresh.ville }));
+    }).catch(() => {});
   }, []);
 
   const save = async (e) => {
@@ -57,7 +57,7 @@ function GestProfil() {
     setError(null);
     setSuccess(false);
     try {
-      const payload = { nom: form.nom, prenom: form.prenom, email: form.email, telephone: form.telephone };
+      const payload = { nom: form.nom, prenom: form.prenom, email: form.email, telephone: form.telephone, ville: form.ville };
       if (form.password) payload.password = form.password;
       await users.update(user.id, payload);
       setSuccess(true);
@@ -152,14 +152,26 @@ function GestProfil() {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
-            <input
-              type="tel"
-              value={form.telephone}
-              onChange={(e) => setForm({ ...form, telephone: e.target.value })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
+              <input
+                type="tel"
+                value={form.telephone}
+                onChange={(e) => setForm({ ...form, telephone: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Ville <span className="text-gray-400 font-normal">(documents)</span></label>
+              <input
+                type="text"
+                value={form.ville}
+                onChange={(e) => setForm({ ...form, ville: e.target.value })}
+                placeholder="ex. Casablanca"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
           </div>
           <div className="border-t pt-4">
             <p className="text-sm font-medium text-gray-700 mb-3">Changer le mot de passe <span className="font-normal text-gray-400">(laisser vide pour ne pas modifier)</span></p>

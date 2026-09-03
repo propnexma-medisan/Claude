@@ -184,7 +184,7 @@ function htmlQuitus(cotisation, paiements, copropriete, gestionnaire) {
   <div class="signature-section">
     <div class="sig-block">
       <div class="sig-title">Le Syndic / Gestionnaire</div>
-      <div class="sig-date">Fait à ______________________, le ${dateDoc}</div>
+      <div class="sig-date">Fait à ${gestionnaire?.ville ? `<strong>${gestionnaire.ville}</strong>` : '______________________'}, le ${dateDoc}</div>
       ${sigImg
         ? `<img src="${sigImg}" style="max-height:55pt;max-width:160pt;object-fit:contain;display:block;margin-top:4pt;" alt="signature">`
         : '<div class="sig-line">Signature et cachet</div>'}
@@ -494,7 +494,7 @@ router.get('/cotisations/:id/quitus', authenticate, (req, res) => {
 
     const paiements = db.prepare('SELECT * FROM cotisation_paiements WHERE cotisation_id = ? ORDER BY mois ASC').all(req.params.id);
     const copropriete = db.prepare('SELECT * FROM coproprietes WHERE id = ?').get(cotisation.copropriete_id);
-    const gestionnaire = db.prepare('SELECT nom, prenom, signature_url FROM users WHERE id = ?').get(req.user.id);
+    const gestionnaire = db.prepare('SELECT nom, prenom, ville, signature_url FROM users WHERE id = ?').get(req.user.id);
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(htmlQuitus(cotisation, paiements, copropriete, gestionnaire));
