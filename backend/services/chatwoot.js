@@ -121,13 +121,11 @@ async function sendWhatsAppMessage({ phone, name, message, templateParams }) {
       content: TEMPLATE_NAME,
       message_type: 'outgoing',
       private: false,
-      content_attributes: {
-        template_params: {
-          name: TEMPLATE_NAME,
-          category: 'UTILITY',
-          language: 'fr',
-          processed_params: templateParams,
-        },
+      template_params: {
+        name: TEMPLATE_NAME,
+        category: 'UTILITY',
+        language: 'fr',
+        processed_params: templateParams,
       },
     });
   } else {
