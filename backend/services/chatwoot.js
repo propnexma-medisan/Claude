@@ -124,7 +124,7 @@ async function sendWhatsAppMessage({ phone, name, message, templateParams }) {
       template_params: {
         name: TEMPLATE_NAME,
         category: 'UTILITY',
-        language: 'fr',
+        language: 'en',
         processed_params: templateParams,
       },
     });
