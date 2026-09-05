@@ -9,8 +9,9 @@ const TYPE_COLORS = {
 };
 
 const CANAL_ICONS = {
-  'Email':  '✉️',
-  'Lettre': '📄',
+  'Email':    '✉️',
+  'Lettre':   '📄',
+  'WhatsApp': '💬',
 };
 
 const STATUT_COLORS = {
@@ -197,6 +198,7 @@ function ActionBadge({ action, onMarkDeposee, loading }) {
 function DetailPanel({ impayeur, copro, coproprieteId, gestNom, onClose, onActionDone }) {
   const [sendType, setSendType] = useState('Rappel');
   const [sending, setSending] = useState(false);
+  const [sendingWa, setSendingWa] = useState(false);
   const [logging, setLogging] = useState(false);
   const [marking, setMarking] = useState(false);
   const [actions, setActions] = useState(impayeur.actions || []);
@@ -222,6 +224,21 @@ function DetailPanel({ impayeur, copro, coproprieteId, gestNom, onClose, onActio
       onActionDone();
     } catch (e) { setErr(e.message); }
     finally { setSending(false); }
+  };
+
+  const sendWhatsApp = async () => {
+    setSendingWa(true); setErr(null);
+    try {
+      await recApi.sendWhatsApp({
+        copropriete_id: coproprieteId,
+        user_id: impayeur.id,
+        montant_du: impayeur.montant_total_du,
+        retard: `${impayeur.nb_mois_impaye} mois`,
+      });
+      await refreshActions();
+      onActionDone();
+    } catch (e) { setErr(e.message); }
+    finally { setSendingWa(false); }
   };
 
   const logLettre = async () => {
@@ -319,6 +336,12 @@ function DetailPanel({ impayeur, copro, coproprieteId, gestNom, onClose, onActio
                 className="flex-1 flex items-center justify-center gap-1.5 bg-gray-700 text-white text-sm font-medium py-2 rounded-lg hover:bg-gray-800 disabled:opacity-50">
                 {logging ? '…' : <>📄 Lettre PDF</>}
               </button>
+              {sendType === 'Rappel' && impayeur.telephone && (
+                <button onClick={sendWhatsApp} disabled={sendingWa}
+                  className="flex-1 flex items-center justify-center gap-1.5 bg-green-600 text-white text-sm font-medium py-2 rounded-lg hover:bg-green-700 disabled:opacity-50">
+                  {sendingWa ? '…' : <>💬 WhatsApp</>}
+                </button>
+              )}
             </div>
             <p className="text-xs text-gray-400 mt-2">La lettre s'ouvre dans un nouvel onglet pour impression. L'action est enregistrée automatiquement.</p>
           </div>

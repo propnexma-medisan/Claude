@@ -104,8 +104,11 @@ async function findOrCreateContact(phone, name) {
   }
 }
 
-async function sendWhatsAppMessage({ phone, name, message, templateParams }) {
+async function sendWhatsAppMessage({ phone, name, message, templateParams, templateName, templateLanguage }) {
   if (!TOKEN) throw new Error('CHATWOOT_TOKEN non configuré dans .env');
+
+  const tplName = templateName || TEMPLATE_NAME;
+  const tplLang = templateLanguage || 'en'; // défaut historique = activation_copropietaire (enregistré en English)
 
   console.log(`[Chatwoot] Début envoi → ${phone}`);
   const contactId = await findOrCreateContact(phone, name);
@@ -114,17 +117,17 @@ async function sendWhatsAppMessage({ phone, name, message, templateParams }) {
   const conv = await chatwootRequest('/conversations', 'POST', { inbox_id: INBOX, contact_id: contactId });
   console.log(`[Chatwoot] Conversation id=${conv.id}`);
 
-  if (TEMPLATE_NAME && templateParams) {
+  if (tplName && templateParams) {
     // Template message requis pour initier une conversation WhatsApp (fenêtre 24h non ouverte)
-    console.log(`[Chatwoot] Envoi template "${TEMPLATE_NAME}"`);
+    console.log(`[Chatwoot] Envoi template "${tplName}" (${tplLang})`);
     await chatwootRequest(`/conversations/${conv.id}/messages`, 'POST', {
-      content: TEMPLATE_NAME,
+      content: tplName,
       message_type: 'outgoing',
       private: false,
       template_params: {
-        name: TEMPLATE_NAME,
+        name: tplName,
         category: 'UTILITY',
-        language: 'en',
+        language: tplLang,
         processed_params: templateParams,
       },
     });

@@ -5,6 +5,7 @@ const db = require('../database');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { canGestionnaireAccessResidence } = require('../utils/access');
 const { sendRelance } = require('../services/email');
+const { sendWhatsAppMessage } = require('../services/chatwoot');
 
 const router = express.Router();
 
@@ -174,6 +175,58 @@ router.post('/send-email', authenticate, requireRole('gestionnaire', 'admin'), a
       INSERT INTO recouvrement_actions (copropriete_id, user_id, type, canal, statut, montant_du, created_by)
       VALUES (?, ?, ?, 'Email', 'Envoyé', ?, ?)
     `).run(copropriete_id, user_id, type, montant_du || null, req.user.id);
+
+    res.status(201).json(db.prepare('SELECT * FROM recouvrement_actions WHERE id = ?').get(r.lastInsertRowid));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/recouvrement/send-whatsapp — envoyer un rappel WhatsApp (template Meta) + logger l'action
+// Limité au type 'Rappel' : Relance/Mise en demeure restent email/PDF (valeur légale, accusé de réception)
+router.post('/send-whatsapp', authenticate, requireRole('gestionnaire', 'admin'), async (req, res) => {
+  try {
+    const { copropriete_id, user_id, montant_du, retard } = req.body;
+    if (!copropriete_id || !user_id) {
+      return res.status(400).json({ error: 'copropriete_id et user_id requis' });
+    }
+    if (req.user.role === 'gestionnaire' && !canGestionnaireAccessResidence(req.user.id, copropriete_id)) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    const copro = db.prepare('SELECT nom FROM coproprietes WHERE id = ?').get(copropriete_id);
+    const target = db.prepare(`
+      SELECT u.prenom, u.nom, u.telephone, l.numero as lot_numero
+      FROM users u LEFT JOIN lots l ON u.lot_id = l.id
+      WHERE u.id = ?
+    `).get(user_id);
+    if (!target) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+
+    const tel = target.telephone?.replace(/[\s\-]/g, '').replace(/^0/, '+212');
+    if (!tel) return res.status(400).json({ error: 'Numéro de téléphone manquant' });
+
+    const montantStr = montant_du
+      ? Number(montant_du).toLocaleString('fr-MA', { minimumFractionDigits: 2 })
+      : '—';
+
+    await sendWhatsAppMessage({
+      phone: tel,
+      name: `${target.prenom} ${target.nom}`,
+      templateName: 'recouvrement_rappel',
+      templateLanguage: 'fr',
+      templateParams: {
+        '1': target.prenom || target.nom || 'Madame/Monsieur',
+        '2': montantStr,
+        '3': target.lot_numero || '',
+        '4': copro?.nom || '',
+        '5': retard || '',
+      },
+    });
+
+    const r = db.prepare(`
+      INSERT INTO recouvrement_actions (copropriete_id, user_id, type, canal, statut, montant_du, created_by)
+      VALUES (?, ?, 'Rappel', 'WhatsApp', 'Envoyé', ?, ?)
+    `).run(copropriete_id, user_id, montant_du || null, req.user.id);
 
     res.status(201).json(db.prepare('SELECT * FROM recouvrement_actions WHERE id = ?').get(r.lastInsertRowid));
   } catch (err) {

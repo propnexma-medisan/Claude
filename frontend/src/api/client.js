@@ -288,6 +288,7 @@ export const recouvrement = {
   logAction: (data) => api.post('/recouvrement/actions', data),
   markDeposee: (id) => api.put(`/recouvrement/actions/${id}/deposee`, {}),
   sendEmail: (data) => api.post('/recouvrement/send-email', data),
+  sendWhatsApp: (data) => api.post('/recouvrement/send-whatsapp', data),
 };
 
 export const rapports = {
