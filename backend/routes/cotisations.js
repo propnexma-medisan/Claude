@@ -186,7 +186,7 @@ function htmlQuitus(cotisation, paiements, copropriete, gestionnaire) {
       <div class="sig-title">Le Syndic / Gestionnaire</div>
       <div class="sig-date">Fait à ${gestionnaire?.ville ? `<strong>${gestionnaire.ville}</strong>` : '______________________'}, le ${dateDoc}</div>
       ${sigImg
-        ? `<img src="${sigImg}" style="max-height:55pt;max-width:160pt;object-fit:contain;display:block;margin-top:4pt;" alt="signature">`
+        ? `<img src="${sigImg}" style="max-height:55pt;max-width:160pt;object-fit:contain;display:block;margin-top:4pt;mix-blend-mode:multiply;" alt="signature"><div class="sig-line" style="border-top:none;padding-top:2pt;">Signature et cachet</div>`
         : '<div class="sig-line">Signature et cachet</div>'}
     </div>
     <div class="sig-block" style="text-align:right;">
