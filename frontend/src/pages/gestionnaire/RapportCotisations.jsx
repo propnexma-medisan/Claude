@@ -131,8 +131,8 @@ export default function RapportCotisations() {
           </div>
 
           {/* Table */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden print:overflow-visible">
+            <div className="overflow-x-auto print:overflow-visible">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200 text-left">
