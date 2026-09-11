@@ -141,7 +141,7 @@ function GestionnaireLayout() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen print:h-auto bg-gray-100">
       {/* Mobile backdrop */}
       {sidebarOpen && (
         <div
@@ -259,9 +259,9 @@ function GestionnaireLayout() {
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden print:overflow-visible">
         {/* Mobile header bar */}
-        <header className="lg:hidden flex items-center gap-3 px-4 py-3 bg-white border-b shadow-sm flex-shrink-0">
+        <header className="lg:hidden flex items-center gap-3 px-4 py-3 bg-white border-b shadow-sm flex-shrink-0 print:hidden">
           <button
             onClick={() => setSidebarOpen(true)}
             className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
@@ -273,7 +273,7 @@ function GestionnaireLayout() {
           <span className="font-semibold text-gray-800">SyndicPro</span>
         </header>
 
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto print:overflow-visible">
           <div className="p-4 lg:p-6 min-h-full">
             <Outlet />
           </div>
