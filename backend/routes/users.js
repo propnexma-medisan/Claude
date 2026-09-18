@@ -280,7 +280,7 @@ router.post('/:id/resend-credentials', authenticate, requireRole('gestionnaire',
 
     db.prepare('UPDATE users SET password_hash = ?, activation_token = ?, must_activate = 1 WHERE id = ?').run(password_hash, activationToken, id);
 
-    await sendBienvenue({
+    const emailSent = await sendBienvenue({
       to: existing.email,
       prenom: existing.prenom,
       nom: existing.nom,
@@ -290,7 +290,15 @@ router.post('/:id/resend-credentials', authenticate, requireRole('gestionnaire',
       residence: existing.copropriete_nom || null,
     });
 
-    res.json({ message: 'Identifiants renvoyés avec succès', tempPassword, email: existing.email, activationToken });
+    res.json({
+      message: emailSent
+        ? 'Identifiants renvoyés avec succès'
+        : "Mot de passe régénéré, mais l'email n'a pas pu être envoyé (vérifiez RESEND_API_KEY côté serveur)",
+      emailSent,
+      tempPassword,
+      email: existing.email,
+      activationToken,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

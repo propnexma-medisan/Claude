@@ -81,8 +81,12 @@ function Copropietaires() {
     if (!confirm(`Générer un nouveau mot de passe et renvoyer les identifiants à ${u.prenom} ${u.nom} (${u.email}) ?`)) return;
     setResendingId(u.id);
     try {
-      await users.resendCredentials(u.id);
-      alert(`Identifiants renvoyés à ${u.email}`);
+      const res = await users.resendCredentials(u.id);
+      if (res.emailSent === false) {
+        alert(`⚠️ Mot de passe régénéré mais l'email n'a pas pu être envoyé à ${u.email}.\nMot de passe temporaire : ${res.tempPassword}\n(à communiquer manuellement, ou vérifiez la configuration email côté serveur)`);
+      } else {
+        alert(`Identifiants renvoyés à ${u.email}`);
+      }
     } catch (err) {
       alert(`Erreur : ${err.message}`);
     } finally {
