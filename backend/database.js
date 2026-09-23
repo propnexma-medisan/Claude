@@ -375,6 +375,18 @@ try {
   )`);
 } catch {}
 
+// Pièces jointes des dépenses
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS depense_pieces_jointes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    depense_id INTEGER NOT NULL REFERENCES depenses(id) ON DELETE CASCADE,
+    filename TEXT NOT NULL,
+    original_name TEXT NOT NULL,
+    mimetype TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+} catch {}
+
 // AG — présences par lot
 try {
   db.exec(`CREATE TABLE IF NOT EXISTS assemblee_presences (

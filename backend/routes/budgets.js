@@ -1,4 +1,7 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const db = require('../database');
 const { authenticate } = require('../middleware/auth');
 const { sendAppelFonds } = require('../services/email');
@@ -7,6 +10,34 @@ const { canGestionnaireAccessResidence } = require('../utils/access');
 const APP_URL = process.env.APP_URL || 'https://syndicpro.propnex.ma';
 
 const router = express.Router();
+
+const uploadDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+const depenseUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadDir),
+    filename: (req, file, cb) => cb(null, `dep-${Date.now()}-${file.originalname.replace(/\s+/g, '_')}`),
+  }),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ok = file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf';
+    cb(null, ok);
+  },
+});
+
+function attachDepensePJ(depensesRows) {
+  if (!depensesRows.length) return depensesRows;
+  const ids = depensesRows.map((d) => d.id);
+  const pjs = db.prepare(
+    `SELECT * FROM depense_pieces_jointes WHERE depense_id IN (${ids.map(() => '?').join(',')}) ORDER BY created_at ASC`
+  ).all(...ids);
+  const byDep = {};
+  for (const pj of pjs) {
+    if (!byDep[pj.depense_id]) byDep[pj.depense_id] = [];
+    byDep[pj.depense_id].push({ ...pj, url: `/api/uploads/${pj.filename}` });
+  }
+  return depensesRows.map((d) => ({ ...d, pieces_jointes: byDep[d.id] || [] }));
+}
 
 const CATEGORIES_BUDGET = [
   'Honoraires syndic',
@@ -318,7 +349,7 @@ router.get('/depenses', authenticate, (req, res) => {
     query += ' ORDER BY d.date_depense DESC, d.created_at DESC';
 
     const depenses = db.prepare(query).all(...params);
-    res.json(depenses);
+    res.json(attachDepensePJ(depenses));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -345,7 +376,7 @@ router.post('/depenses', authenticate, (req, res) => {
       LEFT JOIN fournisseurs f ON f.id = d.fournisseur_id
       WHERE d.id = ?
     `).get(result.lastInsertRowid);
-    res.status(201).json(depense);
+    res.status(201).json({ ...depense, pieces_jointes: [] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -386,7 +417,53 @@ router.put('/depenses/:id', authenticate, (req, res) => {
       LEFT JOIN fournisseurs f ON f.id = d.fournisseur_id
       WHERE d.id = ?
     `).get(req.params.id);
-    res.json(updated);
+    res.json(attachDepensePJ([updated])[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/depenses/:id/pieces-jointes — add one or more files to an existing dépense
+router.post('/depenses/:id/pieces-jointes', authenticate, depenseUpload.array('files', 10), (req, res) => {
+  try {
+    const depense = db.prepare('SELECT * FROM depenses WHERE id = ?').get(req.params.id);
+    if (!depense) return res.status(404).json({ error: 'Dépense non trouvée' });
+    if (!canAccessCopropriete(req.user, depense.copropriete_id, true)) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    const insertPJ = db.prepare(
+      'INSERT INTO depense_pieces_jointes (depense_id, filename, original_name, mimetype) VALUES (?, ?, ?, ?)'
+    );
+    for (const f of req.files || []) {
+      insertPJ.run(depense.id, f.filename, f.originalname, f.mimetype);
+    }
+
+    const pjs = db.prepare(
+      'SELECT * FROM depense_pieces_jointes WHERE depense_id = ? ORDER BY created_at ASC'
+    ).all(depense.id).map((p) => ({ ...p, url: `/api/uploads/${p.filename}` }));
+
+    res.status(201).json(pjs);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/depenses/pj/:id — remove one attached file from a dépense
+router.delete('/depenses/pj/:id', authenticate, (req, res) => {
+  try {
+    const pj = db.prepare('SELECT * FROM depense_pieces_jointes WHERE id = ?').get(req.params.id);
+    if (!pj) return res.status(404).json({ error: 'Fichier non trouvé' });
+
+    const depense = db.prepare('SELECT * FROM depenses WHERE id = ?').get(pj.depense_id);
+    if (depense && !canAccessCopropriete(req.user, depense.copropriete_id, true)) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    const filePath = path.join(uploadDir, pj.filename);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    db.prepare('DELETE FROM depense_pieces_jointes WHERE id = ?').run(pj.id);
+    res.json({ message: 'Fichier supprimé' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -399,6 +476,12 @@ router.delete('/depenses/:id', authenticate, (req, res) => {
     if (!depense) return res.status(404).json({ error: 'Dépense non trouvée' });
     if (!canAccessCopropriete(req.user, depense.copropriete_id, req.method !== "GET")) {
       return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    const pjs = db.prepare('SELECT * FROM depense_pieces_jointes WHERE depense_id = ?').all(depense.id);
+    for (const pj of pjs) {
+      const fp = path.join(uploadDir, pj.filename);
+      if (fs.existsSync(fp)) fs.unlinkSync(fp);
     }
 
     db.prepare('DELETE FROM depenses WHERE id = ?').run(req.params.id);

@@ -615,7 +615,13 @@ function TabDepenses({ coproprieteId }) {
                   <td className="px-4 py-3 text-gray-500 font-mono text-xs">{d.numero_facture || '—'}</td>
                   <td className="px-4 py-3 text-right font-semibold text-gray-800">{formatMAD(d.montant)}</td>
                   <td className="px-4 py-3 text-center">
-                    {d.justificatif_url ? (
+                    {(d.pieces_jointes?.length > 0) ? (
+                      <button type="button" onClick={() => { setEditingDepense(d); setShowModal(true); }}
+                        className="inline-flex items-center gap-1 text-blue-500 hover:text-blue-700 text-xs">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                        {d.pieces_jointes.length}
+                      </button>
+                    ) : d.justificatif_url ? (
                       <a href={BASE_URL + d.justificatif_url} target="_blank" rel="noreferrer"
                         className="inline-flex items-center gap-1 text-blue-500 hover:text-blue-700 text-xs">
                         {d.justificatif_url.endsWith('.pdf') ? (
@@ -691,21 +697,43 @@ function DepenseModal({ depense, coproprieteId, budgetsList, onClose, onSaved })
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [fournisseursList, setFournisseursList] = useState([]);
+  const [piecesJointes, setPiecesJointes] = useState(depense?.pieces_jointes || []);
+  const [pendingFiles, setPendingFiles] = useState([]);
 
   useEffect(() => {
     fournisseursApi.getAll(coproprieteId).then(setFournisseursList).catch(() => {});
   }, [coproprieteId]);
 
-  const uploadJustificatif = async (file) => {
-    setUploading(true);
+  const addFiles = async (fileList) => {
+    const newFiles = Array.from(fileList);
+    if (!newFiles.length) return;
+    if (isEdit) {
+      setUploading(true);
+      try {
+        const updated = await depensesApi.uploadPiecesJointes(depense.id, newFiles);
+        setPiecesJointes(updated);
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        setUploading(false);
+      }
+    } else {
+      setPendingFiles((prev) => [...prev, ...newFiles]);
+    }
+  };
+
+  const removePendingFile = (idx) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const removeExistingFile = async (pjId) => {
+    if (!confirm('Supprimer cette pièce jointe ?')) return;
     try {
-      const token = localStorage.getItem('syndic_token');
-      const fd = new FormData();
-      fd.append('file', file);
-      const res = await fetch(`${BASE_URL}/api/upload`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd });
-      const data = await res.json();
-      if (data.url) setForm(f => ({ ...f, justificatif_url: data.url }));
-    } catch { } finally { setUploading(false); }
+      await depensesApi.deletePieceJointe(pjId);
+      setPiecesJointes((prev) => prev.filter((p) => p.id !== pjId));
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -713,10 +741,15 @@ function DepenseModal({ depense, coproprieteId, budgetsList, onClose, onSaved })
     setSaving(true);
     try {
       const payload = { ...form, budget_id: form.budget_id || null, fournisseur_id: form.fournisseur_id || null };
+      let depenseId = depense?.id;
       if (isEdit) {
-        await depensesApi.update(depense.id, payload);
+        await depensesApi.update(depenseId, payload);
       } else {
-        await depensesApi.create(payload);
+        const created = await depensesApi.create(payload);
+        depenseId = created.id;
+      }
+      if (pendingFiles.length > 0) {
+        await depensesApi.uploadPiecesJointes(depenseId, pendingFiles);
       }
       onSaved();
     } catch (err) {
@@ -782,8 +815,9 @@ function DepenseModal({ depense, coproprieteId, budgetsList, onClose, onSaved })
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Pièce justificative <span className="text-gray-400 font-normal">(optionnel — photo ou PDF)</span>
+              Pièces justificatives <span className="text-gray-400 font-normal">(optionnel — photos ou PDF, plusieurs fichiers possibles)</span>
             </label>
+
             {form.justificatif_url && (
               <div className="flex items-center gap-2 mb-2 p-2 bg-gray-50 rounded-lg">
                 {form.justificatif_url.endsWith('.pdf') ? (
@@ -791,14 +825,36 @@ function DepenseModal({ depense, coproprieteId, budgetsList, onClose, onSaved })
                 ) : (
                   <img src={BASE_URL + form.justificatif_url} alt="Justificatif" className="w-16 h-12 object-cover rounded" />
                 )}
-                <a href={BASE_URL + form.justificatif_url} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline flex-1 truncate">Voir le fichier</a>
+                <a href={BASE_URL + form.justificatif_url} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline flex-1 truncate">Voir le fichier (ancien justificatif)</a>
                 <button type="button" onClick={() => setForm(f => ({ ...f, justificatif_url: '' }))} className="text-gray-400 hover:text-red-500 text-xs">Supprimer</button>
               </div>
             )}
-            <input type="file" accept="image/*,application/pdf"
-              onChange={e => e.target.files[0] && uploadJustificatif(e.target.files[0])}
+
+            {piecesJointes.map((pj) => (
+              <div key={pj.id} className="flex items-center gap-2 mb-2 p-2 bg-gray-50 rounded-lg">
+                {pj.mimetype === 'application/pdf' ? (
+                  <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                ) : (
+                  <img src={BASE_URL + pj.url} alt={pj.original_name} className="w-16 h-12 object-cover rounded" />
+                )}
+                <a href={BASE_URL + pj.url} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline flex-1 truncate">{pj.original_name}</a>
+                <button type="button" onClick={() => removeExistingFile(pj.id)} className="text-gray-400 hover:text-red-500 text-xs">Supprimer</button>
+              </div>
+            ))}
+
+            {pendingFiles.map((f, i) => (
+              <div key={i} className="flex items-center gap-2 mb-2 p-2 bg-blue-50 rounded-lg">
+                <svg className="w-5 h-5 text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                <span className="text-xs text-gray-600 flex-1 truncate">{f.name} <span className="text-gray-400">(pas encore envoyé)</span></span>
+                <button type="button" onClick={() => removePendingFile(i)} className="text-gray-400 hover:text-red-500 text-xs">Retirer</button>
+              </div>
+            ))}
+
+            <input type="file" accept="image/*,application/pdf" multiple
+              onChange={e => e.target.files.length && addFiles(e.target.files)}
               className="w-full text-sm text-gray-500 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
             {uploading && <p className="text-xs text-gray-400 mt-1">Téléchargement en cours...</p>}
+            {!isEdit && pendingFiles.length > 0 && <p className="text-xs text-gray-400 mt-1">Les fichiers seront envoyés à la création de la dépense.</p>}
           </div>
           <div className="flex gap-3 pt-2">
             <button type="submit" disabled={saving || uploading} className="flex-1 bg-blue-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">

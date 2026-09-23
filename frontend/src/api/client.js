@@ -220,6 +220,17 @@ export const depenses = {
   create: (data) => api.post('/depenses', data),
   update: (id, data) => api.put(`/depenses/${id}`, data),
   delete: (id) => api.delete(`/depenses/${id}`),
+  uploadPiecesJointes: (id, files) => {
+    const form = new FormData();
+    for (const f of files) form.append('files', f);
+    const token = getToken();
+    return fetch(`${BASE_URL}/depenses/${id}/pieces-jointes`, {
+      method: 'POST',
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: form,
+    }).then((r) => r.ok ? r.json() : r.json().then((e) => Promise.reject(new Error(e.error || 'Erreur upload'))));
+  },
+  deletePieceJointe: (pjId) => api.delete(`/depenses/pj/${pjId}`),
 };
 
 export const appelsFonds = {
