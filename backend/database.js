@@ -347,14 +347,14 @@ try {
 // Flag bureau syndical pour copropriétaires (sans changer leur rôle)
 try { db.exec('ALTER TABLE users ADD COLUMN is_membre_bureau INTEGER DEFAULT 0'); } catch {}
 
-// Table recouvrement (actions email + lettres)
+// Table recouvrement (actions email + lettres + whatsapp)
 try {
   db.exec(`CREATE TABLE IF NOT EXISTS recouvrement_actions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     copropriete_id INTEGER NOT NULL REFERENCES coproprietes(id) ON DELETE CASCADE,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     type TEXT NOT NULL CHECK(type IN ('Rappel','Relance','Mise en demeure')),
-    canal TEXT NOT NULL CHECK(canal IN ('Email','Lettre')),
+    canal TEXT NOT NULL CHECK(canal IN ('Email','Lettre','WhatsApp')),
     statut TEXT NOT NULL DEFAULT 'Envoyé' CHECK(statut IN ('Envoyé','À déposer','Déposé')),
     montant_du REAL,
     notes TEXT,
@@ -362,6 +362,31 @@ try {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 } catch {}
+
+// Migration: la contrainte CHECK sur canal ne listait pas 'WhatsApp' à sa création —
+// SQLite ne permet pas d'ALTER une contrainte CHECK, donc on reconstruit la table si besoin.
+try {
+  const existing = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='recouvrement_actions'`).get();
+  if (existing && existing.sql && !existing.sql.includes('WhatsApp')) {
+    db.exec(`
+      ALTER TABLE recouvrement_actions RENAME TO recouvrement_actions_old;
+      CREATE TABLE recouvrement_actions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        copropriete_id INTEGER NOT NULL REFERENCES coproprietes(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        type TEXT NOT NULL CHECK(type IN ('Rappel','Relance','Mise en demeure')),
+        canal TEXT NOT NULL CHECK(canal IN ('Email','Lettre','WhatsApp')),
+        statut TEXT NOT NULL DEFAULT 'Envoyé' CHECK(statut IN ('Envoyé','À déposer','Déposé')),
+        montant_du REAL,
+        notes TEXT,
+        created_by INTEGER REFERENCES users(id),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      INSERT INTO recouvrement_actions SELECT * FROM recouvrement_actions_old;
+      DROP TABLE recouvrement_actions_old;
+    `);
+  }
+} catch (e) { console.error('[migration recouvrement_actions.canal]', e.message); }
 
 // Pièces jointes des messages de diffusion
 try {
