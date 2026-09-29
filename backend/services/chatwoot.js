@@ -109,9 +109,10 @@ async function findOrCreateContact(phone, name) {
   // 2. Créer le contact
   try {
     console.log(`[Chatwoot] Création contact ${phone}`);
-    const contact = await chatwootRequest('/contacts', 'POST', { name, phone_number: phone });
-    console.log(`[Chatwoot] Contact créé id=${contact.id}`);
-    return contact.id;
+    const res = await chatwootRequest('/contacts', 'POST', { name, phone_number: phone });
+    const newId = res?.payload?.contact?.id ?? res?.id;
+    console.log(`[Chatwoot] Contact créé id=${newId}`);
+    return newId;
   } catch (e) {
     // Si déjà pris entre temps, retry recherche
     if (e.message.includes('already been taken')) {
