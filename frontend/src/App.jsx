@@ -37,6 +37,7 @@ import GestProfil from './pages/gestionnaire/GestProfil';
 import RapportCotisations from './pages/gestionnaire/RapportCotisations';
 import Documents from './pages/gestionnaire/Documents';
 import Activation from './pages/gestionnaire/Activation';
+import LeadsAgence from './pages/gestionnaire/LeadsAgence';
 
 // Copropriétaire pages
 import MonProfil from './pages/copropietaire/MonProfil';
@@ -45,6 +46,7 @@ import MesCotisations from './pages/copropietaire/MesCotisations';
 import MesTickets from './pages/copropietaire/MesTickets';
 import MesMessages from './pages/copropietaire/MesMessages';
 import MesAG from './pages/copropietaire/MesAG';
+import ServicesAgence from './pages/copropietaire/ServicesAgence';
 
 // Membre bureau pages
 import MembreBureauLayout from './components/MembreBureauLayout';
@@ -96,6 +98,7 @@ function App() {
         <Route path="budgets" element={<AdminBudgets />} />
         <Route path="communications" element={<AdminCommunications />} />
         <Route path="membres-bureau" element={<MembresBureau />} />
+        <Route path="leads-agence" element={<LeadsAgence />} />
       </Route>
 
       {/* Gestionnaire */}
@@ -115,6 +118,7 @@ function App() {
         <Route path="rapport" element={<RapportCotisations />} />
         <Route path="documents" element={<Documents />} />
         <Route path="activation" element={<Activation />} />
+        <Route path="leads-agence" element={<LeadsAgence />} />
       </Route>
 
       {/* Membre bureau syndical */}
@@ -139,6 +143,7 @@ function App() {
         <Route path="tickets" element={<MesTickets />} />
         <Route path="messages" element={<MesMessages />} />
         <Route path="ag" element={<MesAG />} />
+        <Route path="services-agence" element={<ServicesAgence />} />
       </Route>
 
       {/* Fallback */}

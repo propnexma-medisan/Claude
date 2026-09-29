@@ -560,6 +560,59 @@ async function sendQuitus({ to, prenom, nom, lot_numero, copropriete_nom, coprop
   });
 }
 
+// ─── 11. Nouvelle demande agence (vente/location) — vers l'équipe commerciale ─
+
+async function sendNouvelleDemandeAgence({ demande }) {
+  const AGENCE_EMAIL = process.env.AGENCE_EMAIL || 'agence@propnex.ma';
+  const nomComplet = `${demande.user_prenom || ''} ${demande.user_nom || ''}`.trim();
+  const typeLabel = demande.type_demande === 'Vendre' ? 'Vente' : 'Location';
+  const prixFormate = demande.prix_estime
+    ? Number(demande.prix_estime).toLocaleString('fr-MA', { minimumFractionDigits: 0 }) + ' MAD'
+    : 'Non précisé';
+
+  const content = `
+    <h2 style="color:#1e3a5f;margin-top:0;">Nouvelle demande — ${typeLabel}</h2>
+    <p style="color:#4b5563;font-size:15px;line-height:1.6;">
+      Un copropriétaire souhaite être contacté par l'agence pour ${demande.type_demande === 'Vendre' ? 'vendre' : 'louer'} son bien.
+    </p>
+
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin:20px 0;">
+      <div style="font-size:14px;font-weight:bold;color:#1e3a5f;margin-bottom:12px;">&#128100; Contact</div>
+      <table cellpadding="0" cellspacing="0" width="100%">
+        ${infoRow('Nom', nomComplet)}
+        ${infoRow('Téléphone', demande.user_telephone || '—')}
+        ${infoRow('Email', demande.user_email)}
+        ${infoRow('Canal préféré', demande.canal_prefere || '—')}
+      </table>
+    </div>
+
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin:20px 0;">
+      <div style="font-size:14px;font-weight:bold;color:#1e3a5f;margin-bottom:12px;">&#127968; Bien concerné</div>
+      <table cellpadding="0" cellspacing="0" width="100%">
+        ${infoRow('Résidence', demande.copropriete_nom)}
+        ${demande.copropriete_adresse ? infoRow('Adresse', demande.copropriete_adresse) : ''}
+        ${demande.lot_numero ? infoRow('Lot', `N° ${demande.lot_numero}${demande.lot_type ? ` — ${demande.lot_type}` : ''}`) : ''}
+      </table>
+    </div>
+
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:20px;margin:20px 0;">
+      <div style="font-size:14px;font-weight:bold;color:#1e3a5f;margin-bottom:12px;">&#128203; Demande</div>
+      <table cellpadding="0" cellspacing="0" width="100%">
+        ${infoRow('Type', typeLabel)}
+        ${infoRow('Délai souhaité', demande.delai || 'Non précisé')}
+        ${infoRow('Prix envisagé', prixFormate)}
+      </table>
+      ${demande.notes ? `<p style="color:#4b5563;font-size:14px;margin-top:12px;line-height:1.6;">${demande.notes}</p>` : ''}
+    </div>
+  `;
+
+  return sendEmail({
+    to: AGENCE_EMAIL,
+    subject: `[SyndicPro] Nouvelle demande ${typeLabel} — ${nomComplet}`,
+    html: baseTemplate(content),
+  });
+}
+
 module.exports = {
   sendEmail,
   sendBienvenue,
@@ -572,4 +625,5 @@ module.exports = {
   sendAlertExpirationCotisation,
   sendConvocation,
   sendQuitus,
+  sendNouvelleDemandeAgence,
 };

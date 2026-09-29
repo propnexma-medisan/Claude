@@ -412,6 +412,23 @@ try {
   )`);
 } catch {}
 
+// Demandes de services agence (vente / location) déposées par les copropriétaires
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS demandes_agence (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    copropriete_id INTEGER NOT NULL REFERENCES coproprietes(id) ON DELETE CASCADE,
+    lot_id INTEGER REFERENCES lots(id) ON DELETE SET NULL,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type_demande TEXT NOT NULL CHECK(type_demande IN ('Vendre','Louer')),
+    delai TEXT,
+    prix_estime REAL,
+    canal_prefere TEXT,
+    notes TEXT,
+    statut TEXT NOT NULL DEFAULT 'Nouveau' CHECK(statut IN ('Nouveau','Contacté','Qualifié','Perdu','Converti')),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+} catch {}
+
 // AG — présences par lot
 try {
   db.exec(`CREATE TABLE IF NOT EXISTS assemblee_presences (

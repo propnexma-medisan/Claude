@@ -306,6 +306,12 @@ export const rapports = {
   getCotisations: (coproprieteId) => api.get(`/rapports/cotisations?copropriete_id=${coproprieteId}`),
 };
 
+export const agence = {
+  create: (data) => api.post('/agence/demandes', data),
+  getAll: (params) => api.get(`/agence/demandes${params ? '?' + new URLSearchParams(params) : ''}`),
+  update: (id, data) => api.put(`/agence/demandes/${id}`, data),
+};
+
 export const adminApi = {
   getStats: () => api.get('/admin/stats'),
   getDashboard: () => api.get('/admin/dashboard'),

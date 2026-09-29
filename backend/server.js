@@ -59,6 +59,7 @@ const budgetsRouter = require('./routes/budgets');
 const cotisationsRouter = require('./routes/cotisations');
 const fournisseursRouter = require('./routes/fournisseurs');
 const recouvrementRouter = require('./routes/recouvrement');
+const agenceRouter = require('./routes/agence');
 const adminRouter = require('./routes/admin');
 
 app.use('/api/coproprietes', authenticate, copropietesRouter);
@@ -74,6 +75,7 @@ app.use('/api', budgetsRouter);
 app.use('/api', cotisationsRouter);
 app.use('/api/fournisseurs', authenticate, fournisseursRouter);
 app.use('/api/recouvrement', authenticate, recouvrementRouter);
+app.use('/api/agence', agenceRouter);
 app.use('/api/admin', authenticate, requireRole('admin'), adminRouter);
 
 // Rapport cotisations — accessible admin + gestionnaire
