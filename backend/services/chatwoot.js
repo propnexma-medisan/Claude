@@ -8,6 +8,24 @@ const ACCOUNT = process.env.CHATWOOT_ACCOUNT_ID || '2';
 const INBOX = parseInt(process.env.CHATWOOT_INBOX_ID || '6', 10);
 const TEMPLATE_NAME = process.env.CHATWOOT_TEMPLATE_NAME || '';
 
+// Normalise un numéro marocain vers le format E.164 strict qu'exige Chatwoot (+212XXXXXXXXX).
+// Gère les formats déjà rencontrés en base : 0635133112, 635133112, 212635133112,
+// +212 635 13 31 12, 00212635133112.
+function normalizePhone(raw) {
+  if (!raw) return '';
+  let digits = String(raw).replace(/[^\d+]/g, '');
+  digits = digits.replace(/^00/, '+');
+  if (digits.startsWith('+')) {
+    digits = '+' + digits.slice(1).replace(/\D/g, '');
+  } else {
+    digits = digits.replace(/\D/g, '');
+    if (digits.startsWith('212')) digits = '+' + digits;
+    else if (digits.startsWith('0')) digits = '+212' + digits.slice(1);
+    else digits = '+212' + digits;
+  }
+  return digits;
+}
+
 function chatwootRequest(path, method = 'GET', body = null) {
   return new Promise((resolve, reject) => {
     const url = new URL(`/api/v1/accounts/${ACCOUNT}${path}`, BASE);
@@ -110,8 +128,11 @@ async function sendWhatsAppMessage({ phone, name, message, templateParams, templ
   const tplName = templateName || TEMPLATE_NAME;
   const tplLang = templateLanguage || 'en'; // défaut historique = activation_copropietaire (enregistré en English)
 
-  console.log(`[Chatwoot] Début envoi → ${phone}`);
-  const contactId = await findOrCreateContact(phone, name);
+  const normalizedPhone = normalizePhone(phone);
+  if (!normalizedPhone) throw new Error('Numéro de téléphone manquant ou invalide');
+
+  console.log(`[Chatwoot] Début envoi → ${normalizedPhone}`);
+  const contactId = await findOrCreateContact(normalizedPhone, name);
 
   console.log(`[Chatwoot] Création conversation inbox=${INBOX} contact=${contactId}`);
   const conv = await chatwootRequest('/conversations', 'POST', { inbox_id: INBOX, contact_id: contactId });
