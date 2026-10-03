@@ -188,6 +188,7 @@ export const messages = {
   },
   delete: (id) => api.delete(`/messages/${id}`),
   deletePJ: (id) => api.delete(`/messages/pj/${id}`),
+  resend: (id) => api.post(`/messages/${id}/resend`, {}),
 };
 
 // Finances

@@ -158,6 +158,48 @@ router.post('/', authenticate, requireRole('gestionnaire', 'admin'), upload.arra
   }
 });
 
+// POST /api/messages/:id/resend — renvoie l'email d'un message existant, sans créer de nouveau message
+router.post('/:id/resend', authenticate, requireRole('gestionnaire', 'admin'), async (req, res) => {
+  try {
+    const message = db.prepare(`
+      SELECT m.*, c.nom as copropriete_nom
+      FROM messages_diffusion m
+      JOIN coproprietes c ON m.copropriete_id = c.id
+      WHERE m.id = ?
+    `).get(req.params.id);
+    if (!message) return res.status(404).json({ error: 'Message non trouvé' });
+    if (req.user.role === 'gestionnaire' && !canGestionnaireAccessResidence(req.user.id, message.copropriete_id)) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    const pjs = db.prepare(
+      'SELECT * FROM message_pieces_jointes WHERE message_id = ? ORDER BY created_at ASC'
+    ).all(message.id).map((p) => ({ ...p, url: `/api/uploads/${p.filename}` }));
+
+    const copropietaires = db.prepare(
+      `SELECT id, nom, prenom, email FROM users WHERE role = 'copropietaire' AND copropriete_id = ? AND is_active = 1`
+    ).all(message.copropriete_id);
+    const gestNom = `${req.user.prenom} ${req.user.nom}`;
+
+    const results = await Promise.all(copropietaires.map((u) =>
+      sendMessageBroadcast({
+        to: u.email,
+        prenom: u.prenom,
+        residence: message.copropriete_nom,
+        titre: message.titre,
+        contenu: message.contenu,
+        gestionnaire_nom: gestNom,
+        pieces_jointes: pjs,
+      }).catch(() => false)
+    ));
+
+    const sent = results.filter(Boolean).length;
+    res.json({ total: copropietaires.length, sent, failed: copropietaires.length - sent });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // DELETE /api/messages/pj/:id
 router.delete('/pj/:id', authenticate, requireRole('gestionnaire', 'admin'), (req, res) => {
   try {

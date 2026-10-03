@@ -107,6 +107,18 @@ function Messages() {
     }
   };
 
+  const resend = async (m) => {
+    if (!confirm(`Renvoyer « ${m.titre} » par email aux copropriétaires de ${m.copropriete_nom} ?`)) return;
+    try {
+      const r = await messagesApi.resend(m.id);
+      alert(r.failed > 0
+        ? `${r.sent} email(s) envoyé(s), ${r.failed} échec(s) sur ${r.total} copropriétaire(s). Vérifiez la configuration email.`
+        : `Email envoyé à ${r.sent} copropriétaire(s).`);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   const delPJ = async (msgId, pjId) => {
     try {
       await messagesApi.deletePJ(pjId);
@@ -236,11 +248,18 @@ function Messages() {
                   <p className="text-sm text-gray-600 mt-3 whitespace-pre-wrap">{m.contenu}</p>
                   <PJList pjs={m.pieces_jointes} onDelete={(pjId) => delPJ(m.id, pjId)} />
                 </div>
-                <button onClick={() => del(m.id)} className="ml-4 text-red-400 hover:text-red-600 flex-shrink-0">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
+                <div className="ml-4 flex items-center gap-3 flex-shrink-0">
+                  <button onClick={() => resend(m)} title="Renvoyer par email" className="text-blue-500 hover:text-blue-700">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </button>
+                  <button onClick={() => del(m.id)} title="Supprimer" className="text-red-400 hover:text-red-600">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
           ))}
