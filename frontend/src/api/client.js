@@ -305,6 +305,7 @@ export const recouvrement = {
 
 export const rapports = {
   getCotisations: (coproprieteId) => api.get(`/rapports/cotisations?copropriete_id=${coproprieteId}`),
+  getAvances: (coproprieteId, anneeRef) => api.get(`/rapports/avances?copropriete_id=${coproprieteId}&annee_ref=${anneeRef}`),
 };
 
 export const agence = {

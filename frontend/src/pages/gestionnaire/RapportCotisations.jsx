@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { api } from '../../api/client';
+import { api, rapports as rapportsApi } from '../../api/client';
 
 function Badge({ children, color }) {
   const colors = {
@@ -25,6 +25,104 @@ function TauxBar({ taux }) {
         <div style={{ width: `${taux}%`, backgroundColor: color }} className="h-full rounded-full" />
       </div>
       <span className="text-xs font-medium tabular-nums" style={{ color }}>{taux}%</span>
+    </div>
+  );
+}
+
+function AvancesSection({ coproId }) {
+  const anneeCourante = new Date().getFullYear();
+  const [anneeRef, setAnneeRef] = useState(anneeCourante);
+  const [av, setAv] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    setAv(null);
+    setError(null);
+    rapportsApi.getAvances(coproId, anneeRef).then(setAv).catch((e) => setError(e.message));
+  }, [coproId, anneeRef]);
+
+  const fmt = (n) => Number(n || 0).toLocaleString('fr-FR');
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 mt-6 overflow-hidden print:overflow-visible print:break-inside-avoid">
+      <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-base font-bold text-gray-900">Cotisations perçues d'avance</h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Sommes encaissées au titre d'exercices postérieurs au 31 décembre {anneeRef}. À présenter en avances de copropriétaires, hors recettes de l'exercice {anneeRef}.
+          </p>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-gray-600 print:hidden">
+          Situation au 31 décembre
+          <select
+            value={anneeRef}
+            onChange={(e) => setAnneeRef(parseInt(e.target.value, 10))}
+            className="border border-gray-300 rounded-lg px-2 py-1 text-sm"
+          >
+            {[anneeCourante - 1, anneeCourante, anneeCourante + 1].map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </label>
+      </div>
+
+      {error && <div className="px-4 py-3 text-sm text-red-700 bg-red-50">{error}</div>}
+      {!av && !error && <div className="px-4 py-6 text-sm text-gray-400 text-center">Calcul en cours...</div>}
+
+      {av && av.par_copropietaire.length === 0 && (
+        <div className="px-4 py-6 text-sm text-gray-400 text-center">
+          Aucune cotisation perçue d'avance au 31 décembre {anneeRef}.
+        </div>
+      )}
+
+      {av && av.par_copropietaire.length > 0 && (
+        <div className="overflow-x-auto print:overflow-visible">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200 text-left">
+                <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Lot</th>
+                <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Copropriétaire</th>
+                {av.exercices.map((a) => (
+                  <th key={a} className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap text-right">Exercice {a}</th>
+                ))}
+                <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap text-right">Total d'avance</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {av.par_copropietaire.map((c) => (
+                <tr key={c.user_id}>
+                  <td className="px-4 py-3 font-mono text-xs text-gray-500 whitespace-nowrap">{c.lot_numero || '—'}</td>
+                  <td className="px-4 py-3 font-medium text-gray-900">{c.prenom} {c.nom}</td>
+                  {av.exercices.map((a) => {
+                    const d = c.detail[a];
+                    return (
+                      <td key={a} className="px-4 py-3 text-right tabular-nums whitespace-nowrap">
+                        {d ? (
+                          <>
+                            {fmt(d.montant)} <span className="text-gray-400">DH</span>
+                            <div className="text-xs text-gray-400">{d.mois} mois</div>
+                          </>
+                        ) : <span className="text-gray-300">—</span>}
+                      </td>
+                    );
+                  })}
+                  <td className="px-4 py-3 text-right tabular-nums font-semibold whitespace-nowrap">{fmt(c.total)} <span className="font-normal text-gray-400">DH</span></td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="bg-gray-50 border-t-2 border-gray-200 font-semibold">
+                <td className="px-4 py-3 text-gray-600" colSpan={2}>Total perçu d'avance</td>
+                {av.par_exercice.map((e) => (
+                  <td key={e.annee} className="px-4 py-3 text-right tabular-nums whitespace-nowrap">
+                    {fmt(e.montant)} <span className="font-normal text-gray-400">DH</span>
+                    <div className="text-xs font-normal text-gray-400">{e.mois} mois</div>
+                  </td>
+                ))}
+                <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap text-green-700">{fmt(av.total)} <span className="font-normal text-gray-400">DH</span></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -202,6 +300,8 @@ export default function RapportCotisations() {
               </table>
             </div>
           </div>
+
+          <AvancesSection coproId={coproId} />
 
           {/* Print footer */}
           <div className="hidden print:block mt-6 pt-4 border-t border-gray-200 text-xs text-gray-400 text-center">

@@ -157,6 +157,68 @@ app.get('/api/rapports/cotisations', authenticate, (req, res) => {
   }
 });
 
+// Cotisations perçues d'avance : sommes encaissées au titre d'exercices postérieurs à l'année de référence
+app.get('/api/rapports/avances', authenticate, (req, res) => {
+  if (!['admin', 'gestionnaire'].includes(req.user.role)) {
+    return res.status(403).json({ error: 'Accès refusé' });
+  }
+  try {
+    const { copropriete_id } = req.query;
+    if (!copropriete_id) return res.status(400).json({ error: 'copropriete_id requis' });
+    if (req.user.role === 'gestionnaire') {
+      const { canGestionnaireAccessResidence } = require('./utils/access');
+      if (!canGestionnaireAccessResidence(req.user.id, copropriete_id)) {
+        return res.status(403).json({ error: 'Accès refusé' });
+      }
+    }
+    const anneeRef = parseInt(req.query.annee_ref, 10) || new Date().getFullYear();
+
+    const rows = db.prepare(`
+      SELECT u.id as user_id, u.nom, u.prenom, l.numero as lot_numero,
+        CAST(substr(p.mois, 1, 4) AS INTEGER) as annee,
+        COUNT(*) as nb_mois,
+        SUM(CASE WHEN p.statut = 'Payé' THEN COALESCE(p.montant_regle, p.montant) ELSE COALESCE(p.montant_regle, 0) END) as montant
+      FROM cotisation_paiements p
+      JOIN cotisations c ON c.id = p.cotisation_id
+      JOIN users u ON u.id = c.user_id
+      LEFT JOIN lots l ON l.id = c.lot_id
+      WHERE c.copropriete_id = ?
+        AND p.statut IN ('Payé', 'Partiel')
+        AND CAST(substr(p.mois, 1, 4) AS INTEGER) > ?
+        AND (p.date_paiement IS NULL OR p.date_paiement <= ?)
+      GROUP BY u.id, annee
+      ORDER BY l.numero ASC, annee ASC
+    `).all(copropriete_id, anneeRef, `${anneeRef}-12-31`);
+
+    const exercices = [...new Set(rows.map((r) => r.annee))].sort();
+    const parCopro = new Map();
+    const parExercice = new Map();
+    for (const r of rows) {
+      if (!parCopro.has(r.user_id)) {
+        parCopro.set(r.user_id, { user_id: r.user_id, nom: r.nom, prenom: r.prenom, lot_numero: r.lot_numero, total: 0, detail: {} });
+      }
+      const c = parCopro.get(r.user_id);
+      c.detail[r.annee] = { mois: r.nb_mois, montant: r.montant || 0 };
+      c.total += r.montant || 0;
+      const e = parExercice.get(r.annee) || { annee: r.annee, mois: 0, montant: 0 };
+      e.mois += r.nb_mois;
+      e.montant += r.montant || 0;
+      parExercice.set(r.annee, e);
+    }
+
+    res.json({
+      annee_reference: anneeRef,
+      date_reference: `${anneeRef}-12-31`,
+      exercices,
+      par_exercice: exercices.map((a) => parExercice.get(a)),
+      par_copropietaire: [...parCopro.values()],
+      total: [...parCopro.values()].reduce((s, c) => s + c.total, 0),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Dashboard stats (admin/gestionnaire)
 app.get('/api/dashboard/stats', authenticate, (req, res) => {
   try {
