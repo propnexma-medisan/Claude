@@ -1,7 +1,7 @@
 import { formatMAD } from '../../utils/currency';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { budgets as budgetsApi, depenses as depensesApi, appelsFonds as appelsFondsApi, fournisseurs as fournisseursApi } from '../../api/client';
+import { budgets as budgetsApi, depenses as depensesApi, appelsFonds as appelsFondsApi, fournisseurs as fournisseursApi, coproprietes as coproprietesApi } from '../../api/client';
 
 const CATEGORIES_BUDGET = [
   'Honoraires syndic',
@@ -285,6 +285,7 @@ function TabBudgets({ coproprieteId }) {
           ) : (
             <BudgetDetail
               budget={selectedBudget}
+              coproprieteId={coproprieteId}
               onUpdateLigne={handleUpdateLigne}
               onModifierStatut={() => { setNewStatut(selectedBudget.statut); setShowStatutModal(true); }}
             />
@@ -321,7 +322,83 @@ function TabBudgets({ coproprieteId }) {
   );
 }
 
-function BudgetDetail({ budget, onUpdateLigne, onModifierStatut }) {
+function QuotePartLots({ coproprieteId, totalAnnuel, annee }) {
+  const [lots, setLots] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!coproprieteId) return;
+    setLots(null);
+    setError(null);
+    coproprietesApi.getLots(coproprieteId).then(setLots).catch((e) => setError(e.message));
+  }, [coproprieteId]);
+
+  if (error) return <p className="text-xs text-red-600 px-4 py-3">{error}</p>;
+  if (!lots) return <p className="text-xs text-gray-400 px-4 py-3">Chargement des lots...</p>;
+  if (lots.length === 0) return <p className="text-xs text-gray-400 px-4 py-3">Aucun lot enregistré pour cette résidence.</p>;
+
+  const sommeTantiemes = lots.reduce((s, l) => s + (Number(l.tantiemes) || 0), 0);
+  const parTantiemes = sommeTantiemes > 0;
+  const poids = (l) => (parTantiemes ? Number(l.tantiemes) || 0 : 1);
+  const sommePoids = lots.reduce((s, l) => s + poids(l), 0);
+  const rows = lots.map((l) => {
+    const part = sommePoids > 0 ? poids(l) / sommePoids : 0;
+    return { ...l, part, annuel: totalAnnuel * part, mensuel: (totalAnnuel * part) / 12 };
+  });
+  const totalCheck = rows.reduce((s, r) => s + r.annuel, 0);
+
+  return (
+    <div className="border-t border-gray-100 print:break-inside-avoid">
+      <div className="px-5 py-4">
+        <h3 className="text-base font-bold text-gray-800">Quote-part par lot — Budget {annee}</h3>
+        <p className="text-xs text-gray-500 mt-0.5">
+          {parTantiemes
+            ? 'Répartition au prorata des tantièmes de chaque lot.'
+            : 'Tantièmes non renseignés : répartition en parts égales (1 lot = 1 part). Renseignez-les dans Lots pour une répartition au prorata.'}
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 border-y border-gray-200 text-left">
+              <th className="px-4 py-2 font-semibold text-gray-600">Lot</th>
+              <th className="px-4 py-2 font-semibold text-gray-600">Type</th>
+              <th className="px-4 py-2 font-semibold text-gray-600">Copropriétaire</th>
+              <th className="px-4 py-2 font-semibold text-gray-600 text-right">{parTantiemes ? 'Tantièmes' : 'Part'}</th>
+              <th className="px-4 py-2 font-semibold text-gray-600 text-right">Quote-part</th>
+              <th className="px-4 py-2 font-semibold text-gray-600 text-right">Annuel</th>
+              <th className="px-4 py-2 font-semibold text-gray-600 text-right">Mensuel</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {rows.map((r) => (
+              <tr key={r.id}>
+                <td className="px-4 py-2 font-mono text-xs text-gray-600 whitespace-nowrap">{r.numero}</td>
+                <td className="px-4 py-2 text-gray-600">{r.type}</td>
+                <td className="px-4 py-2 text-gray-800">{[r.copropietaire_prenom, r.copropietaire_nom].filter(Boolean).join(' ') || r.proprietaire_nom || '—'}</td>
+                <td className="px-4 py-2 text-right tabular-nums text-gray-600">{parTantiemes ? (Number(r.tantiemes) || 0) : 1}</td>
+                <td className="px-4 py-2 text-right tabular-nums text-gray-600">{(r.part * 100).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} %</td>
+                <td className="px-4 py-2 text-right tabular-nums font-medium">{formatMAD(r.annuel)}</td>
+                <td className="px-4 py-2 text-right tabular-nums">{formatMAD(r.mensuel)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="bg-gray-50 border-t-2 border-gray-200 font-semibold">
+              <td className="px-4 py-2" colSpan={3}>Total ({rows.length} lots)</td>
+              <td className="px-4 py-2 text-right tabular-nums">{sommePoids}</td>
+              <td className="px-4 py-2 text-right tabular-nums">100 %</td>
+              <td className="px-4 py-2 text-right tabular-nums">{formatMAD(totalCheck)}</td>
+              <td className="px-4 py-2 text-right tabular-nums">{formatMAD(totalCheck / 12)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function BudgetDetail({ budget, coproprieteId, onUpdateLigne, onModifierStatut }) {
   const lignes = budget.lignes || [];
 
   // Compute column totals
@@ -376,6 +453,7 @@ function BudgetDetail({ budget, onUpdateLigne, onModifierStatut }) {
         </table>
       </div>
       <p className="text-xs text-gray-400 px-4 py-2">Cliquez sur une cellule pour la modifier. Le montant annuel est recalculé automatiquement depuis les mois.</p>
+      <QuotePartLots coproprieteId={coproprieteId} totalAnnuel={totalAnnuel} annee={budget.annee} />
     </div>
   );
 }
