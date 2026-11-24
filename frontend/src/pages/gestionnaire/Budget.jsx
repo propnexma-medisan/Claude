@@ -241,23 +241,22 @@ function TabBudgets({ coproprieteId }) {
         </button>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6">
+      <div className="flex flex-col gap-4">
         {/* List */}
-        <div className="w-full lg:w-72 lg:flex-shrink-0">
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Budgets</h3>
+        <div className="w-full">
           {budgetsList.length === 0 ? (
-            <div className="text-center py-8 text-gray-400 text-sm bg-white rounded-lg border border-gray-200">
+            <div className="text-center py-4 text-gray-400 text-sm bg-white rounded-lg border border-gray-200">
               Aucun budget créé
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="flex flex-wrap gap-3">
               {budgetsList.map(b => (
                 <div
                   key={b.id}
-                  className={`p-3 rounded-lg border cursor-pointer transition-colors ${selectedBudget?.id === b.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'}`}
+                  className={`p-3 rounded-lg border cursor-pointer transition-colors min-w-[200px] ${selectedBudget?.id === b.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'}`}
                   onClick={() => openBudget(b.id)}
                 >
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center justify-between gap-3 mb-1">
                     <span className="font-bold text-gray-800">{b.annee}</span>
                     <StatutBadge statut={b.statut} />
                   </div>
@@ -265,7 +264,7 @@ function TabBudgets({ coproprieteId }) {
                   {b.statut === 'Brouillon' && (
                     <button
                       onClick={(e) => { e.stopPropagation(); deleteBudget(b.id); }}
-                      className="mt-2 text-xs text-red-500 hover:text-red-700"
+                      className="mt-1 text-xs text-red-500 hover:text-red-700"
                     >
                       Supprimer
                     </button>
